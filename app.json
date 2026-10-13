@@ -1,17 +1,23 @@
 {
   "expo": {
-    "name": "tabigo-mobile",
-    "slug": "tabigo-mobile",
+    "name": "TABIGO",
+    "slug": "tabigo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#FBF8FF",
+    "splash": {
+      "backgroundColor": "#FBF8FF"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tabigo.app"
     },
     "android": {
+      "package": "com.tabigo.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FBF8FF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
