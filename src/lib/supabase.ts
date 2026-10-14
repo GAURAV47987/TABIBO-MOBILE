@@ -61,3 +61,29 @@ export async function getTrip(id: string) {
   if (error) throw error;
   return data;
 }
+
+export async function updateTrip(id: string, fields: Record<string, any>) {
+  const { error } = await supabase
+    .from("trips")
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteTrip(id: string) {
+  const { error } = await supabase.from("trips").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// Shared app-wide photo cache (see supabase/add_place_photos_cache.sql in
+// the web repo) — a photo found for one trip is reused by every trip,
+// any user, asking about the same place name from then on.
+export async function getCachedPlacePhoto(name: string) {
+  const { data, error } = await supabase.from("place_photos").select("photo_url").eq("name", name).maybeSingle();
+  if (error) return undefined;
+  return data ? data.photo_url : undefined;
+}
+
+export async function cachePlacePhoto(name: string, photoUrl: string) {
+  await supabase.from("place_photos").upsert({ name, photo_url: photoUrl, resolved_at: new Date().toISOString() });
+}

@@ -5,11 +5,13 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Home, Luggage, Compass } from "lucide-react-native";
 import type { Session } from "@supabase/supabase-js";
 import { getSession, onAuthStateChange } from "./src/lib/supabase";
 import { colors } from "./src/theme";
 import AuthScreen from "./src/screens/AuthScreen";
 import PlaceholderScreen from "./src/screens/PlaceholderScreen";
+import TripsScreen from "./src/screens/TripsScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -23,9 +25,23 @@ function MainTabs() {
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
       }}
     >
-      <Tab.Screen name="Home">{() => <PlaceholderScreen label="Your next adventure starts here." />}</Tab.Screen>
-      <Tab.Screen name="Trips">{() => <PlaceholderScreen label="Your trips will show up here." />}</Tab.Screen>
-      <Tab.Screen name="Explore">{() => <PlaceholderScreen label="Explore is coming soon." />}</Tab.Screen>
+      <Tab.Screen
+        name="Home"
+        options={{ tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
+      >
+        {() => <PlaceholderScreen label="Your next adventure starts here." />}
+      </Tab.Screen>
+      <Tab.Screen
+        name="Trips"
+        component={TripsScreen}
+        options={{ tabBarIcon: ({ color, size }) => <Luggage color={color} size={size} /> }}
+      />
+      <Tab.Screen
+        name="Explore"
+        options={{ tabBarIcon: ({ color, size }) => <Compass color={color} size={size} /> }}
+      >
+        {() => <PlaceholderScreen label="Explore is coming soon." />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
