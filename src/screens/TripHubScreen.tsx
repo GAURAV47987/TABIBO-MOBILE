@@ -8,6 +8,8 @@ import { getTrip, updateTrip } from "../lib/supabase";
 import { getEffectiveStops, buildDatedStops } from "../lib/stops";
 import PlaceBanner from "../components/PlaceBanner";
 import ItineraryView from "../components/ItineraryView";
+import BudgetView from "../components/BudgetView";
+import ConvertView from "../components/ConvertView";
 
 function dateRangeLabel(start?: string | null, end?: string | null) {
   return start && end ? `${start} — ${end}` : "Dates not set yet";
@@ -91,7 +93,9 @@ export default function TripHubScreen() {
 
       <View style={{ flex: 1 }}>
         {tab === "itinerary" && <ItineraryView trip={trip} onSave={save("itinerary")} onSetDates={setTripDates} />}
-        {tab !== "itinerary" && (
+        {tab === "budget" && <BudgetView trip={trip} onSave={save("budget")} />}
+        {tab === "convert" && <ConvertView homeCurrency={trip.home_currency || "USD"} />}
+        {(tab === "map" || tab === "pack") && (
           <View style={styles.center}>
             <Text style={styles.comingSoon}>{TRIP_TABS.find((t) => t.id === tab)?.label} is coming soon.</Text>
           </View>
