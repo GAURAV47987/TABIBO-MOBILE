@@ -35,3 +35,62 @@ export const FX_API_URLS = [
   "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json",
   "https://latest.currency-api.pages.dev/v1/currencies/usd.json",
 ];
+
+// Builds a packing list shaped by the trip's actual climate (avgHigh in °C,
+// rainyDays across the trip) instead of one fixed list for every
+// destination. climate is null while it's still loading or unavailable.
+export function buildPackingCategories(climate: { avgHigh?: number | null; rainyDays?: number } | null) {
+  const clothingItems = ["Comfortable walking shoes", "Sleepwear", "Underwear & socks"];
+
+  if (!climate || climate.avgHigh == null) {
+    clothingItems.push("Weather-appropriate outfits (forecast unavailable)");
+  } else if (climate.avgHigh >= 27) {
+    clothingItems.push("Light, breathable clothing", "Shorts", "Swimwear", "Sun hat", "Sunglasses", "Sandals");
+  } else if (climate.avgHigh >= 18) {
+    clothingItems.push("Light layers", "A light jacket for evenings", "Sunglasses");
+  } else if (climate.avgHigh >= 10) {
+    clothingItems.push("Warm layers", "A proper jacket", "Long pants", "Closed-toe shoes");
+  } else {
+    clothingItems.push("Heavy coat", "Thermal base layers", "Gloves & beanie", "Scarf", "Waterproof boots");
+  }
+  if (climate?.rainyDays && climate.rainyDays > 0) {
+    clothingItems.push("Rain jacket / compact umbrella");
+  }
+
+  return [
+    {
+      id: "documents",
+      title: "Documents & money",
+      items: [
+        "Passport",
+        "Visa / entry documents (if required)",
+        "Travel insurance details",
+        "Flight & accommodation confirmations",
+        "Local currency / cards",
+        "Copies of important documents (digital + physical)",
+      ],
+    },
+    {
+      id: "electronics",
+      title: "Electronics",
+      items: ["Phone + charger", "Power bank", "Universal travel adapter", "Headphones", "Camera (optional)"],
+    },
+    {
+      id: "toiletries",
+      title: "Toiletries",
+      items: [
+        "Toothbrush & toothpaste",
+        "Deodorant",
+        climate?.avgHigh != null && climate.avgHigh >= 20 ? "Sunscreen" : "Moisturizer (dry/cold air)",
+        "Basic medication / first-aid",
+        "Any prescription medication",
+      ],
+    },
+    { id: "clothing", title: "Clothing", items: clothingItems },
+    {
+      id: "extras",
+      title: "Extras",
+      items: ["Reusable water bottle", "Day bag / backpack", "Snacks for transit", "Entertainment for the journey"],
+    },
+  ];
+}
