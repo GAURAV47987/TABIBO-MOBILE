@@ -47,6 +47,49 @@ export function onAuthStateChange(callback: (session: any) => void) {
   return () => subscription.unsubscribe();
 }
 
+export async function createTrip({
+  destinationName,
+  lat,
+  lng,
+  startDate,
+  endDate,
+  homeCurrency,
+  stops,
+}: {
+  destinationName: string;
+  lat: number;
+  lng: number;
+  startDate?: string | null;
+  endDate?: string | null;
+  homeCurrency?: string;
+  stops?: any[];
+}) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+  const { data, error } = await supabase
+    .from("trips")
+    .insert({
+      user_id: user.id,
+      destination_name: destinationName,
+      destination_lat: lat,
+      destination_lng: lng,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      home_currency: homeCurrency || "USD",
+      stops: stops || [],
+      itinerary: [],
+      budget: [],
+      packing: {},
+      map_pins: [],
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function listTrips() {
   const { data, error } = await supabase
     .from("trips")
