@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Home, Luggage, Compass } from "lucide-react-native";
@@ -12,8 +13,10 @@ import { colors } from "./src/theme";
 import AuthScreen from "./src/screens/AuthScreen";
 import PlaceholderScreen from "./src/screens/PlaceholderScreen";
 import TripsScreen from "./src/screens/TripsScreen";
+import TripHubScreen from "./src/screens/TripHubScreen";
 
 const Tab = createBottomTabNavigator();
+const RootStack = createNativeStackNavigator();
 
 function MainTabs() {
   return (
@@ -67,7 +70,14 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <NavigationContainer>
-          {session ? <MainTabs /> : <AuthScreen />}
+          {session ? (
+            <RootStack.Navigator screenOptions={{ headerShown: false }}>
+              <RootStack.Screen name="MainTabs" component={MainTabs} />
+              <RootStack.Screen name="TripHub" component={TripHubScreen} />
+            </RootStack.Navigator>
+          ) : (
+            <AuthScreen />
+          )}
         </NavigationContainer>
         <StatusBar style="auto" />
       </SafeAreaProvider>

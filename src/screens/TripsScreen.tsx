@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Trash2 } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
 import { listTrips, deleteTrip, updateTrip } from "../lib/supabase";
@@ -27,6 +27,7 @@ type Trip = {
 };
 
 export default function TripsScreen() {
+  const navigation = useNavigation<any>();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -104,7 +105,11 @@ export default function TripsScreen() {
       contentContainerStyle={styles.list}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); refresh(); }} tintColor={colors.primaryBg} />}
       renderItem={({ item }) => (
-        <TouchableOpacity style={styles.tile} activeOpacity={0.9}>
+        <TouchableOpacity
+          style={styles.tile}
+          activeOpacity={0.9}
+          onPress={() => navigation.navigate("TripHub", { tripId: item.id })}
+        >
           <PlaceBanner
             placeName={photoQuery(item)}
             savedUrl={item.photo_url}

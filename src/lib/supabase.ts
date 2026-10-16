@@ -87,3 +87,21 @@ export async function getCachedPlacePhoto(name: string) {
 export async function cachePlacePhoto(name: string, photoUrl: string) {
   await supabase.from("place_photos").upsert({ name, photo_url: photoUrl, resolved_at: new Date().toISOString() });
 }
+
+async function friendlyFunctionError(error: any) {
+  try {
+    const body = await error?.context?.json();
+    if (body?.error) return new Error(body.error);
+  } catch (e) {}
+  return error;
+}
+
+// Deployed under the name "rapid-function" (its creation template's route
+// stuck even after the function was renamed) — same backend function the
+// web app calls.
+export async function generateItinerary({ stops }: { stops: { name: string; days: number }[] }) {
+  const { data, error } = await supabase.functions.invoke("rapid-function", { body: { stops } });
+  if (error) throw await friendlyFunctionError(error);
+  if (data?.error) throw new Error(data.error);
+  return data; // { days: [{ day, items: [{ time, title, notes, type }] }] }
+}
