@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from "react-native";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Calendar, Wallet, ArrowLeftRight, Map as MapIcon, Luggage } from "lucide-react-native";
+import { Calendar, Wallet, ArrowLeftRight, Map as MapIcon, Luggage, FileText, WifiOff } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
-import { getTrip, updateTrip } from "../lib/supabase";
+import { loadTrip, updateTrip, patchCachedTrip } from "../lib/supabase";
+import { syncTripReminders } from "../lib/reminders";
 import { getEffectiveStops, buildDatedStops } from "../lib/stops";
 import PlaceBanner from "../components/PlaceBanner";
 import ItineraryView from "../components/ItineraryView";
@@ -12,6 +13,7 @@ import BudgetView from "../components/BudgetView";
 import ConvertView from "../components/ConvertView";
 import TripMapView from "../components/TripMapView";
 import PackingView from "../components/PackingView";
+import DocumentsView from "../components/DocumentsView";
 
 function dateRangeLabel(start?: string | null, end?: string | null) {
   return start && end ? `${start} — ${end}` : "Dates not set yet";
@@ -27,6 +29,7 @@ const TRIP_TABS = [
   { id: "convert", label: "Convert", Icon: ArrowLeftRight },
   { id: "map", label: "Map", Icon: MapIcon },
   { id: "pack", label: "Pack", Icon: Luggage },
+  { id: "docs", label: "Docs", Icon: FileText },
 ];
 
 export default function TripHubScreen() {
@@ -35,25 +38,67 @@ export default function TripHubScreen() {
   const { tripId } = route.params;
   const [trip, setTrip] = useState<any>(null);
   const [tab, setTab] = useState("itinerary");
+  const [offline, setOffline] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useFocusEffect(
     useCallback(() => {
-      getTrip(tripId).then(setTrip);
+      loadTrip(tripId).then(
+        ({ data, fromCache }) => {
+          setTrip(data);
+          setOffline(fromCache);
+          setLoadError("");
+          syncTripReminders(data);
+        },
+        (err) => setLoadError(err.message || "Could not load this trip")
+      );
     }, [tripId])
   );
 
+  // Optimistic: the UI updates immediately; if the write fails (usually no
+  // signal) the change is rolled back and the user is told, rather than it
+  // silently vanishing on the next reload.
+  const persist = async (fields: Record<string, any>) => {
+    const before = trip;
+    const next = { ...trip, ...fields };
+    setTrip(next);
+    try {
+      await updateTrip(tripId, fields);
+      patchCachedTrip(tripId, fields);
+      setOffline(false);
+      if ("itinerary" in fields || "start_date" in fields) syncTripReminders(next);
+    } catch (err: any) {
+      setTrip(before);
+      setOffline(true);
+      Alert.alert("Not saved", "You appear to be offline. Your trip is viewable, but changes need a connection.");
+      throw err;
+    }
+  };
+
   const save = (field: string) => (value: any) => {
-    setTrip((t: any) => ({ ...t, [field]: value }));
-    updateTrip(tripId, { [field]: value });
+    persist({ [field]: value }).catch(() => {});
   };
 
   const setTripDates = async (startDate: string) => {
     const stops = getEffectiveStops(trip).map((s: any) => ({ name: s.name, lat: s.lat, lng: s.lng, days: s.days || 1 }));
     const dated = buildDatedStops(stops, startDate);
     const endDate = dated[dated.length - 1]?.endDate || null;
-    setTrip((t: any) => ({ ...t, start_date: startDate, end_date: endDate, stops: dated }));
-    await updateTrip(tripId, { start_date: startDate, end_date: endDate, stops: dated });
+    await persist({ start_date: startDate, end_date: endDate, stops: dated }).catch(() => {});
   };
+
+  if (!trip && loadError) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <WifiOff size={28} color={colors.textMuted} />
+        <Text style={[styles.comingSoon, { marginTop: spacing(2), textAlign: "center", paddingHorizontal: spacing(6) }]}>
+          {loadError}. Open this trip once while online to keep a copy for offline use.
+        </Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: spacing(4) }}>
+          <Text style={{ color: colors.textSecondary, textDecorationLine: "underline" }}>Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   if (!trip) {
     return (
@@ -73,7 +118,7 @@ export default function TripHubScreen() {
           savedUrl={trip.photo_url}
           onResolved={(url) => {
             setTrip((t: any) => ({ ...t, photo_url: url }));
-            updateTrip(tripId, { photo_url: url });
+            updateTrip(tripId, { photo_url: url }).catch(() => {});
           }}
           height={160}
           style={{ borderRadius: radius.lg }}
@@ -93,12 +138,20 @@ export default function TripHubScreen() {
         </PlaceBanner>
       </View>
 
+      {offline && (
+        <View style={styles.offlineBar}>
+          <WifiOff size={14} color={colors.textSecondary} />
+          <Text style={styles.offlineText}>Offline — showing your saved copy</Text>
+        </View>
+      )}
+
       <View style={{ flex: 1 }}>
         {tab === "itinerary" && <ItineraryView trip={trip} onSave={save("itinerary")} onSetDates={setTripDates} />}
         {tab === "budget" && <BudgetView trip={trip} onSave={save("budget")} />}
         {tab === "convert" && <ConvertView homeCurrency={trip.home_currency || "USD"} />}
         {tab === "map" && <TripMapView trip={trip} onSave={save("map_pins")} />}
         {tab === "pack" && <PackingView trip={trip} onSave={save("packing")} />}
+        {tab === "docs" && <DocumentsView trip={trip} offline={offline} onSave={(docs) => persist({ documents: docs })} />}
       </View>
 
       <View style={styles.tabBar}>
@@ -128,6 +181,15 @@ const styles = StyleSheet.create({
   bannerTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
   bannerDate: { color: "rgba(255,255,255,0.85)", fontSize: 13, marginTop: 2 },
   bannerStops: { color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 2 },
+  offlineBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1.5),
+    marginHorizontal: spacing(4),
+    marginTop: -spacing(2),
+    marginBottom: spacing(1),
+  },
+  offlineText: { fontSize: 12, color: colors.textSecondary },
   tabBar: {
     flexDirection: "row",
     borderTopWidth: 1,

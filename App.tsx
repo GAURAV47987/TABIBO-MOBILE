@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator, TouchableOpacity, StyleSheet } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
+import * as Notifications from "expo-notifications";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -19,9 +20,29 @@ import NewTripScreen from "./src/screens/NewTripScreen";
 import TemplatePreviewScreen from "./src/screens/TemplatePreviewScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import AdminScreen from "./src/screens/AdminScreen";
+import LegalScreen from "./src/screens/LegalScreen";
+import OnboardingScreen from "./src/screens/OnboardingScreen";
+import { loadFromStorage, saveToStorage } from "./src/lib/storage";
+import { initNotifications } from "./src/lib/reminders";
+import { initMonitoring, setMonitoringUser, wrapRoot } from "./src/lib/monitoring";
+
+initMonitoring();
+initNotifications();
+
+const ONBOARDING_KEY = "onboardingSeen";
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
+const navigationRef = createNavigationContainerRef<any>();
+
+// Tapping a trip reminder opens that trip — whether the app was running or
+// launched cold from the notification.
+function openTripFromNotification(response: Notifications.NotificationResponse | null) {
+  const tripId = response?.notification.request.content.data?.tripId;
+  if (typeof tripId === "string" && navigationRef.isReady()) {
+    navigationRef.navigate("TripHub", { tripId });
+  }
+}
 
 // The center tab never actually shows a screen — tapping it just opens
 // NewTrip as a modal on the root stack, same as the web app's raised "+"
@@ -78,16 +99,32 @@ function MainTabs() {
   );
 }
 
-export default function App() {
+function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [onboardingSeen, setOnboardingSeen] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
     getSession().then(setSession);
     const unsubscribe = onAuthStateChange(setSession);
+    loadFromStorage<boolean>(ONBOARDING_KEY).then((seen) => setOnboardingSeen(!!seen));
     return unsubscribe;
   }, []);
 
-  if (session === undefined) {
+  useEffect(() => {
+    setMonitoringUser(session?.user?.id ?? null);
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(openTripFromNotification);
+    return () => sub.remove();
+  }, []);
+
+  const finishOnboarding = () => {
+    setOnboardingSeen(true);
+    saveToStorage(ONBOARDING_KEY, true);
+  };
+
+  if (session === undefined || onboardingSeen === undefined) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
         <ActivityIndicator color={colors.primaryBg} size="large" />
@@ -95,10 +132,22 @@ export default function App() {
     );
   }
 
+  if (session && !onboardingSeen) {
+    return (
+      <SafeAreaProvider>
+        <OnboardingScreen onDone={finishOnboarding} />
+        <StatusBar style="auto" />
+      </SafeAreaProvider>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer>
+        <NavigationContainer
+          ref={navigationRef}
+          onReady={() => Notifications.getLastNotificationResponseAsync().then(openTripFromNotification).catch(() => {})}
+        >
           {session ? (
             <RootStack.Navigator screenOptions={{ headerShown: false }}>
               <RootStack.Screen name="MainTabs" component={MainTabs} />
@@ -109,6 +158,7 @@ export default function App() {
                 {({ navigation }) => <ProfileScreen session={session} navigation={navigation} />}
               </RootStack.Screen>
               <RootStack.Screen name="Admin" component={AdminScreen} options={{ presentation: "modal" }} />
+              <RootStack.Screen name="Legal" component={LegalScreen} options={{ presentation: "modal" }} />
             </RootStack.Navigator>
           ) : (
             <AuthScreen />
@@ -136,3 +186,5 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 });
+
+export default wrapRoot(App);

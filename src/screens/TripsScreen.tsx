@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Trash2 } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
-import { listTrips, deleteTrip, updateTrip } from "../lib/supabase";
+import { loadTrips, deleteTrip, updateTrip } from "../lib/supabase";
 import { getEffectiveStops } from "../lib/stops";
 import PlaceBanner from "../components/PlaceBanner";
 import AppHeader from "../components/AppHeader";
@@ -33,11 +33,13 @@ export default function TripsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
-      const data = await listTrips();
+      const { data, fromCache } = await loadTrips();
       setTrips(data as Trip[]);
+      setOffline(fromCache);
       setError("");
     } catch (err: any) {
       setError(err.message || "Could not load your trips");
@@ -109,6 +111,7 @@ export default function TripsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <AppHeader />
+      {offline && <Text style={styles.offlineText}>Offline — showing your saved trips. Pull down to retry.</Text>}
       <FlatList
       data={trips}
       keyExtractor={(t) => t.id}
@@ -125,7 +128,7 @@ export default function TripsScreen() {
           <PlaceBanner
             placeName={photoQuery(item)}
             savedUrl={item.photo_url}
-            onResolved={(url) => updateTrip(item.id, { photo_url: url })}
+            onResolved={(url) => updateTrip(item.id, { photo_url: url }).catch(() => {})}
             height={140}
             style={{ borderRadius: radius.lg }}
           >
@@ -151,6 +154,7 @@ export default function TripsScreen() {
 }
 
 const styles = StyleSheet.create({
+  offlineText: { fontSize: 12, color: colors.textSecondary, paddingHorizontal: spacing(4), paddingTop: spacing(2) },
   center: {
     flex: 1,
     alignItems: "center",

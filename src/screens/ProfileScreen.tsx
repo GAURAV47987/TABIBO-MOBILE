@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { User, X } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
-import { signOut, changePassword, getAvatarUrl, uploadAvatar } from "../lib/supabase";
+import { signOut, changePassword, getAvatarUrl, uploadAvatar, deleteMyAccount } from "../lib/supabase";
 import { isAdmin } from "../lib/admin";
 
 export default function ProfileScreen({ session, navigation }: any) {
@@ -18,7 +18,40 @@ export default function ProfileScreen({ session, navigation }: any) {
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const memberSince = session.user.created_at
+  const [deleting, setDeleting] = useState(false);
+
+  // Two-step confirm: account deletion is immediate and irreversible.
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      "Delete your account?",
+      "This permanently deletes your account and everything in it — all trips, itineraries, budgets, documents and photos. This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          style: "destructive",
+          onPress: () =>
+            Alert.alert("Are you absolutely sure?", `Your account ${session.user.email} will be deleted now.`, [
+              { text: "Keep my account", style: "cancel" },
+              { text: "Delete forever", style: "destructive", onPress: runDeleteAccount },
+            ]),
+        },
+      ]
+    );
+  };
+
+  const runDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await deleteMyAccount();
+      // The auth listener in App.tsx switches to the Auth screen.
+    } catch (err: any) {
+      setDeleting(false);
+      Alert.alert("Couldn't delete account", (err.message || "Something went wrong") + "\n\nCheck your connection and try again.");
+    }
+  };
+
+  const memberSince =session.user.created_at
     ? new Date(session.user.created_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
     : null;
 
@@ -159,8 +192,21 @@ export default function ProfileScreen({ session, navigation }: any) {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+        <TouchableOpacity style={styles.signOutButton} onPress={() => signOut().catch(() => {})}>
           <Text style={styles.signOutText}>Sign out</Text>
+        </TouchableOpacity>
+
+        <View style={styles.legalRow}>
+          <TouchableOpacity onPress={() => navigation.navigate("Legal", { doc: "terms" })}>
+            <Text style={styles.linkText}>Terms of Service</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("Legal", { doc: "privacy" })}>
+            <Text style={styles.linkText}>Privacy Policy</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.deleteAccountButton} onPress={confirmDeleteAccount} disabled={deleting}>
+          {deleting ? <ActivityIndicator color={colors.stamp} /> : <Text style={styles.deleteAccountText}>Delete account</Text>}
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -245,4 +291,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   signOutText: { color: colors.stamp, fontWeight: "600" },
+  legalRow: { flexDirection: "row", justifyContent: "center", gap: spacing(6), marginTop: spacing(6) },
+  deleteAccountButton: { alignItems: "center", paddingVertical: spacing(4), marginTop: spacing(2), marginBottom: spacing(6) },
+  deleteAccountText: { color: colors.stamp, fontSize: 14 },
 });

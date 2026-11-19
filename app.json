@@ -31,9 +31,18 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "TABIGO uses your photos to let you set a profile picture."
+          "photosPermission": "TABIGO uses your photos to let you set a profile picture and attach booking confirmations or travel documents to your trips.",
+          "cameraPermission": "TABIGO uses the camera so you can photograph tickets, booking confirmations or travel documents and save them to your trip."
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7C5CFC",
+          "defaultChannel": "trip-reminders"
+        }
+      ],
+      "@sentry/react-native"
     ]
   }
 }

@@ -69,3 +69,26 @@ Requires an [expo.dev](https://expo.dev) account (free) linked via
 `npx eas login`, and — before actual App Store/Play Store submission —
 an Apple Developer Program membership ($99/year) and a Google Play
 Developer account ($25 one-time).
+
+## Before App Store / Play Store submission
+
+1. **Run the database migration.** Paste
+   `supabase/add_account_deletion_and_documents.sql` into the Supabase SQL
+   Editor and run it once. It adds `delete_my_account()` (in-app account
+   deletion, required by App Store Guideline 5.1.1(v)) plus the
+   `trips.documents` column and the private `trip-documents` storage
+   bucket. Until it runs, **Delete account** and the **Docs** tab fail with
+   an error.
+2. **Finish the legal text.** `src/lib/legal.ts` holds the Terms of Service
+   and Privacy Policy shown in the app. Fill in `LEGAL_CONTACT_EMAIL` and
+   `LEGAL_GOVERNING_LAW`, have both reviewed, and host the same text at a
+   public URL. Both store forms ask for that URL.
+3. **Crash reporting (Sentry).** Create a Sentry project (React Native),
+   then set `EXPO_PUBLIC_SENTRY_DSN` in a local `.env` and as an EAS
+   environment variable. Without a DSN, monitoring stays off. To get readable
+   stack traces, also set `SENTRY_ORG`, `SENTRY_PROJECT` and
+   `SENTRY_AUTH_TOKEN` as EAS secrets, then remove
+   `SENTRY_DISABLE_AUTO_UPLOAD` from `eas.json`.
+4. **Development build required.** Sentry, notifications and the document
+   picker include native code. Test them in a development build
+   (`npx eas-cli@latest build --profile development`), not Expo Go.

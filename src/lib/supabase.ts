@@ -1,6 +1,8 @@
 import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "expo-crypto";
+import { cancelAllTripReminders, cancelTripReminders } from "./reminders";
 
 // Same Supabase project as the web app (src/supabase.js in the TABIGO
 // repo) — one shared backend behind both the PWA and this native app.
@@ -29,8 +31,43 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function signOut() {
+  await clearLocalUserData();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+}
+
+// Everything this device holds about the signed-in user beyond the auth
+// session itself: offline trip copies and scheduled trip reminders.
+async function clearLocalUserData() {
+  await clearTripCache();
+  await cancelAllTripReminders();
+}
+
+// Permanently deletes the signed-in user's account and everything in it
+// (App Store Guideline 5.1.1(v)). Storage files go first through the
+// Storage API — SQL can't delete them — then the delete_my_account RPC
+// (supabase/add_account_deletion_and_documents.sql) removes the trips and
+// the auth user itself.
+export async function deleteMyAccount() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  const docPaths = await listAllDocumentPaths(user.id);
+  if (docPaths.length) {
+    const { error } = await supabase.storage.from(DOCUMENTS_BUCKET).remove(docPaths);
+    if (error) throw error;
+  }
+  // No avatar is fine — remove() just reports nothing removed.
+  await supabase.storage.from(AVATARS_BUCKET).remove([user.id]);
+
+  const { error } = await supabase.rpc("delete_my_account");
+  if (error) throw error;
+
+  await clearLocalUserData();
+  // The user no longer exists server-side, so only clear the local session.
+  await supabase.auth.signOut({ scope: "local" });
 }
 
 // The actual reset happens on the web app (completing it natively here
@@ -136,6 +173,65 @@ export async function createTrip({
   return data;
 }
 
+// ---- Offline copies -------------------------------------------------------
+// The last successfully loaded trips list and each opened trip are kept in
+// AsyncStorage, so the itinerary (and documents' confirmation numbers)
+// stay viewable with no signal. Cleared on sign-out / account deletion.
+const TRIP_CACHE_PREFIX = "tripCache:";
+const TRIP_LIST_CACHE_KEY = TRIP_CACHE_PREFIX + "list";
+
+async function clearTripCache() {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    await AsyncStorage.multiRemove(keys.filter((k) => k.startsWith(TRIP_CACHE_PREFIX)));
+  } catch (e) {}
+}
+
+async function readCache(key: string) {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeCache(key: string, value: any) {
+  AsyncStorage.setItem(key, JSON.stringify(value)).catch(() => {});
+}
+
+export type Cached<T> = { data: T; fromCache: boolean };
+
+export async function loadTrips(): Promise<Cached<any[]>> {
+  try {
+    const data = await listTrips();
+    writeCache(TRIP_LIST_CACHE_KEY, data);
+    return { data, fromCache: false };
+  } catch (err) {
+    const cached = await readCache(TRIP_LIST_CACHE_KEY);
+    if (cached) return { data: cached, fromCache: true };
+    throw err;
+  }
+}
+
+export async function loadTrip(id: string): Promise<Cached<any>> {
+  try {
+    const data = await getTrip(id);
+    writeCache(TRIP_CACHE_PREFIX + id, data);
+    return { data, fromCache: false };
+  } catch (err) {
+    const cached = await readCache(TRIP_CACHE_PREFIX + id);
+    if (cached) return { data: cached, fromCache: true };
+    throw err;
+  }
+}
+
+// Keeps the offline copy in step with a successful edit.
+export async function patchCachedTrip(id: string, fields: Record<string, any>) {
+  const cached = await readCache(TRIP_CACHE_PREFIX + id);
+  if (cached) writeCache(TRIP_CACHE_PREFIX + id, { ...cached, ...fields });
+}
+
 export async function listTrips() {
   const { data, error } = await supabase
     .from("trips")
@@ -170,7 +266,65 @@ export async function updateTrip(id: string, fields: Record<string, any>) {
 }
 
 export async function deleteTrip(id: string) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    const paths = await listDocumentPaths(user.id, id);
+    if (paths.length) await supabase.storage.from(DOCUMENTS_BUCKET).remove(paths);
+  }
   const { error } = await supabase.from("trips").delete().eq("id", id);
+  if (error) throw error;
+  AsyncStorage.removeItem(TRIP_CACHE_PREFIX + id).catch(() => {});
+  await cancelTripReminders(id);
+}
+
+// ---- Trip documents -------------------------------------------------------
+// Private bucket; files live at "<user id>/<trip id>/<uuid>-<name>" (see
+// supabase/add_account_deletion_and_documents.sql for the RLS policies).
+// Metadata (title, confirmation number…) lives in trips.documents.
+const DOCUMENTS_BUCKET = "trip-documents";
+const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB, matches the bucket limit
+
+async function listDocumentPaths(userId: string, tripId: string) {
+  const { data } = await supabase.storage.from(DOCUMENTS_BUCKET).list(`${userId}/${tripId}`, { limit: 1000 });
+  return (data || []).map((f) => `${userId}/${tripId}/${f.name}`);
+}
+
+async function listAllDocumentPaths(userId: string) {
+  const { data: folders } = await supabase.storage.from(DOCUMENTS_BUCKET).list(userId, { limit: 1000 });
+  const paths: string[] = [];
+  for (const folder of folders || []) {
+    paths.push(...(await listDocumentPaths(userId, folder.name)));
+  }
+  return paths;
+}
+
+export async function uploadTripDocument(tripId: string, file: { uri: string; name: string; mimeType: string }) {
+  const response = await fetch(file.uri);
+  const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > MAX_DOCUMENT_SIZE) throw new Error("File is too large (max 10MB)");
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+  const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, "_").slice(-80);
+  const path = `${user.id}/${tripId}/${randomUUID()}-${safeName}`;
+  const { error } = await supabase.storage.from(DOCUMENTS_BUCKET).upload(path, arrayBuffer, {
+    contentType: file.mimeType,
+  });
+  if (error) throw error;
+  return path;
+}
+
+export async function getTripDocumentUrl(path: string) {
+  const { data, error } = await supabase.storage.from(DOCUMENTS_BUCKET).createSignedUrl(path, 60 * 10);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function deleteTripDocumentFile(path: string) {
+  const { error } = await supabase.storage.from(DOCUMENTS_BUCKET).remove([path]);
   if (error) throw error;
 }
 

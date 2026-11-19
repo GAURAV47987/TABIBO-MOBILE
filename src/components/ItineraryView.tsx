@@ -1,6 +1,9 @@
-import { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
-import { Camera, MapPin, Utensils } from "lucide-react-native";
+import { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking } from "react-native";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { Camera, MapPin, Utensils, Bell, BellOff, Printer } from "lucide-react-native";
+import { areTripRemindersEnabled, enableTripReminders, cancelTripReminders } from "../lib/reminders";
 import { randomUUID } from "expo-crypto";
 import { colors, radius, spacing } from "../theme";
 import { enumerateDates } from "../lib/dates";
@@ -92,6 +95,133 @@ function DayCard({
   );
 }
 
+function escapeHtml(s: any) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+async function exportItineraryPDF(trip: any) {
+  const days = enumerateDates(trip.start_date, trip.end_date);
+  const stops = getEffectiveStops(trip);
+  const items = trip.itinerary || [];
+  const dayBlocks = days
+    .map((date, i) => {
+      const stop = stops.length > 1 ? getStopForDate(stops, date)?.name : null;
+      const dayItems = items
+        .filter((it: any) => it.date === date)
+        .sort((a: any, b: any) => (a.time || "99:99").localeCompare(b.time || "99:99"));
+      const rows = dayItems.length
+        ? dayItems
+            .map(
+              (it: any) => `
+              <tr>
+                <td class="time">${escapeHtml(it.time || "")}</td>
+                <td><div class="title">${escapeHtml(it.title)}</div>${it.notes ? `<div class="notes">${escapeHtml(it.notes)}</div>` : ""}${
+                  it.location ? `<div class="loc">📍 ${escapeHtml(it.location)}</div>` : ""
+                }</td>
+              </tr>`
+            )
+            .join("")
+        : `<tr><td></td><td class="empty">Nothing planned</td></tr>`;
+      return `
+        <section>
+          <h2>${escapeHtml(formatDay(date, i + 1))}${stop ? ` <span class="stop">· ${escapeHtml(stop)}</span>` : ""}</h2>
+          <table>${rows}</table>
+        </section>`;
+    })
+    .join("");
+
+  const route = stops.length > 1 ? `<p class="meta">${stops.map((s: any) => `${escapeHtml(s.name)} (${s.days}d)`).join(" → ")}</p>` : "";
+  const html = `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #222; padding: 24px; }
+          h1 { font-size: 22px; margin: 0 0 4px; }
+          .meta { color: #888; font-size: 12px; margin: 0 0 4px; }
+          section { page-break-inside: avoid; margin-top: 20px; }
+          h2 { font-size: 14px; color: #B23A2E; border-bottom: 1px solid #e5d9c9; padding-bottom: 4px; margin: 0 0 6px; }
+          .stop { color: #888; font-weight: normal; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          td { vertical-align: top; padding: 4px 6px; }
+          .time { width: 52px; font-weight: 600; white-space: nowrap; }
+          .title { font-weight: 500; }
+          .notes, .loc { color: #666; margin-top: 2px; }
+          .empty { color: #aaa; }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(trip.destination_name)}</h1>
+        <p class="meta">${escapeHtml(trip.start_date)} — ${escapeHtml(trip.end_date)} · ${days.length} days</p>
+        ${route}
+        ${dayBlocks}
+      </body>
+    </html>`;
+
+  const { uri } = await Print.printToFileAsync({ html });
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Itinerary PDF", UTI: "com.adobe.pdf" });
+  }
+}
+
+function Toolbar({ trip }: { trip: any }) {
+  const [reminders, setReminders] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    areTripRemindersEnabled(trip.id).then(setReminders);
+  }, [trip.id]);
+
+  const toggleReminders = async () => {
+    setBusy(true);
+    try {
+      if (reminders) {
+        await cancelTripReminders(trip.id);
+        setReminders(false);
+        return;
+      }
+      const { ok, count } = await enableTripReminders(trip);
+      if (!ok) {
+        Alert.alert("Notifications are off", "Allow notifications for TABIGO in Settings to get itinerary reminders.", [
+          { text: "Not now", style: "cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        ]);
+        return;
+      }
+      setReminders(true);
+      Alert.alert(
+        "Reminders on",
+        count > 0
+          ? `You'll get a heads-up an hour before each timed plan (${count} upcoming).`
+          : "You'll get a heads-up an hour before each timed plan. Add times to your items to schedule them."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportPdf = async () => {
+    try {
+      await exportItineraryPDF(trip);
+    } catch (err: any) {
+      Alert.alert("Couldn't export", err.message || "Something went wrong");
+    }
+  };
+
+  return (
+    <View style={styles.toolbar}>
+      <TouchableOpacity style={[styles.toolButton, reminders && styles.toolButtonOn]} onPress={toggleReminders} disabled={busy}>
+        {reminders ? <Bell size={15} color={colors.primaryText} /> : <BellOff size={15} color={colors.textPrimary} />}
+        <Text style={[styles.toolText, reminders && { color: colors.primaryText }]}>{reminders ? "Reminders on" : "Reminders"}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.toolButton} onPress={exportPdf}>
+        <Printer size={15} color={colors.textPrimary} />
+        <Text style={styles.toolText}>Export PDF</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any; onSave: (items: any[]) => void; onSetDates: (startDate: string) => Promise<void> }) {
   const [modalDate, setModalDate] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -128,6 +258,7 @@ export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any;
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
+      <Toolbar trip={trip} />
       <AIGenerateCard trip={trip} onGenerated={(newItems) => onSave([...items, ...newItems])} />
 
       {days.map((date, i) => (
@@ -153,6 +284,21 @@ export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any;
 }
 
 const styles = StyleSheet.create({
+  toolbar: { flexDirection: "row", gap: spacing(2), marginBottom: spacing(3) },
+  toolButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing(1.5),
+    paddingVertical: spacing(2),
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  toolButtonOn: { backgroundColor: colors.primaryBg, borderColor: colors.primaryBg },
+  toolText: { fontSize: 13, fontWeight: "500", color: colors.textPrimary },
   datesCard: {
     margin: spacing(4),
     padding: spacing(4),

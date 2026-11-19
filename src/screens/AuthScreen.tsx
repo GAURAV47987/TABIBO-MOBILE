@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Modal } from "react-native";
 import { colors, radius, spacing } from "../theme";
 import { signIn, signUp, resetPasswordForEmail } from "../lib/supabase";
+import { LegalDocument } from "./LegalScreen";
+import type { LegalDocId } from "../lib/legal";
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
+  const [legalDoc, setLegalDoc] = useState<LegalDocId | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -173,12 +176,29 @@ export default function AuthScreen() {
         <TouchableOpacity style={styles.linkButton} onPress={() => setMode(mode === "signup" ? "signin" : "signup")}>
           <Text style={styles.linkText}>{mode === "signup" ? "Already have an account? Sign in" : "New here? Create an account"}</Text>
         </TouchableOpacity>
+
+        <Text style={styles.legalText}>
+          By {mode === "signup" ? "creating an account" : "continuing"}, you agree to our{" "}
+          <Text style={styles.legalLink} onPress={() => setLegalDoc("terms")}>
+            Terms of Service
+          </Text>{" "}
+          and{" "}
+          <Text style={styles.legalLink} onPress={() => setLegalDoc("privacy")}>
+            Privacy Policy
+          </Text>
+          .
+        </Text>
       </View>
+      <Modal visible={legalDoc !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setLegalDoc(null)}>
+        {legalDoc && <LegalDocument doc={legalDoc} onClose={() => setLegalDoc(null)} />}
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  legalText: { fontSize: 12, color: colors.textMuted, textAlign: "center", marginTop: spacing(4), lineHeight: 18 },
+  legalLink: { color: colors.textSecondary, textDecorationLine: "underline" },
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
