@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking } from "react-native";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
 import { Camera, MapPin, Utensils, Bell, BellOff, Printer } from "lucide-react-native";
 import { areTripRemindersEnabled, enableTripReminders, cancelTripReminders } from "../lib/reminders";
 import { randomUUID } from "expo-crypto";
 import { colors, radius, spacing } from "../theme";
 import { enumerateDates } from "../lib/dates";
 import { getEffectiveStops, getStopForDate } from "../lib/stops";
+import { escapeHtml, exportHtmlAsPdf } from "../lib/pdf";
 import ItemModal from "./ItemModal";
 import AIGenerateCard from "./AIGenerateCard";
 import DateField from "./DateField";
@@ -95,10 +94,6 @@ function DayCard({
   );
 }
 
-function escapeHtml(s: any) {
-  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
-
 async function exportItineraryPDF(trip: any) {
   const days = enumerateDates(trip.start_date, trip.end_date);
   const stops = getEffectiveStops(trip);
@@ -158,10 +153,7 @@ async function exportItineraryPDF(trip: any) {
       </body>
     </html>`;
 
-  const { uri } = await Print.printToFileAsync({ html });
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Itinerary PDF", UTI: "com.adobe.pdf" });
-  }
+  await exportHtmlAsPdf(html, "Itinerary PDF");
 }
 
 function Toolbar({ trip }: { trip: any }) {

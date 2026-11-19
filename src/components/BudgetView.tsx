@@ -3,11 +3,10 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal 
 import { Picker } from "@react-native-picker/picker";
 import { Plus, Wallet, X, Trash2, Printer } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
 import { colors, radius, spacing } from "../theme";
 import { CATEGORIES, CATEGORY_COLOR, CURRENCIES, CURRENCY_SYMBOL } from "../lib/constants";
 import { useFxRates } from "../lib/fx";
+import { escapeHtml, exportHtmlAsPdf } from "../lib/pdf";
 
 function fmt(n: number, maxFractionDigits = 0) {
   return n.toLocaleString(undefined, { maximumFractionDigits: maxFractionDigits });
@@ -91,7 +90,7 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
     const row = (cols: string[]) => `<tr>${cols.map((c) => `<td>${c}</td>`).join("")}</tr>`;
     const table = (head: string[], rows: string[][]) => `
       <table>
-        <thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+        <thead><tr>${head.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
         <tbody>${rows.map(row).join("")}</tbody>
       </table>`;
 
@@ -110,22 +109,23 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
           </style>
         </head>
         <body>
-          <h1>${trip.destination_name} — Budget Summary</h1>
-          <p class="meta">Generated ${today}</p>
-          <p class="total">Total: ${CURRENCY_SYMBOL[homeCurrency]}${fmt(totalHome)} ${homeCurrency} (approx.)</p>
-          ${table(["Currency", "Total"], Object.entries(totals).map(([cur, amt]) => [cur, `${CURRENCY_SYMBOL[cur]}${fmt(amt as number, 2)}`]))}
-          ${table(["Category", `Total (${homeCurrency})`], sortedCategories.map((cat) => [cat, `${CURRENCY_SYMBOL[homeCurrency]}${fmt(categoryTotals[cat], 2)}`]))}
+          <h1>${escapeHtml(trip.destination_name)} — Budget Summary</h1>
+          <p class="meta">Generated ${escapeHtml(today)}</p>
+          <p class="total">Total: ${escapeHtml(CURRENCY_SYMBOL[homeCurrency])}${escapeHtml(fmt(totalHome))} ${escapeHtml(homeCurrency)} (approx.)</p>
+          ${table(["Currency", "Total"], Object.entries(totals).map(([cur, amt]) => [escapeHtml(cur), `${escapeHtml(CURRENCY_SYMBOL[cur])}${escapeHtml(fmt(amt as number, 2))}`]))}
+          ${table(["Category", `Total (${homeCurrency})`], sortedCategories.map((cat) => [escapeHtml(cat), `${escapeHtml(CURRENCY_SYMBOL[homeCurrency])}${escapeHtml(fmt(categoryTotals[cat], 2))}`]))}
           ${table(
             ["Description", "Category", "Amount"],
-            [...budget].reverse().map((e: any) => [e.description, e.category, `${CURRENCY_SYMBOL[e.currency]}${fmt(parseFloat(e.amount), 2)} ${e.currency}`])
+            [...budget].reverse().map((e: any) => [
+              escapeHtml(e.description),
+              escapeHtml(e.category),
+              `${escapeHtml(CURRENCY_SYMBOL[e.currency])}${escapeHtml(fmt(parseFloat(e.amount), 2))} ${escapeHtml(e.currency)}`,
+            ])
           )}
         </body>
       </html>`;
 
-    const { uri } = await Print.printToFileAsync({ html });
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Budget PDF" });
-    }
+    await exportHtmlAsPdf(html, "Budget PDF");
   };
 
   return (

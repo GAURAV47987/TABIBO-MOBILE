@@ -24,9 +24,10 @@ import LegalScreen from "./src/screens/LegalScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
 import { loadFromStorage, saveToStorage } from "./src/lib/storage";
 import { initNotifications } from "./src/lib/reminders";
-import { initMonitoring, setMonitoringUser, wrapRoot } from "./src/lib/monitoring";
+import { setMonitoringUser, wrapRoot } from "./src/lib/monitoring";
 
-initMonitoring();
+// Sentry itself is initialized earlier, in instrument.ts (imported first
+// in index.ts) — by the time this module runs, it's already live.
 initNotifications();
 
 const ONBOARDING_KEY = "onboardingSeen";

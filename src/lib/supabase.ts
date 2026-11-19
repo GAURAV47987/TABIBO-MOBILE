@@ -31,9 +31,12 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function signOut() {
-  await clearLocalUserData();
+  // Confirm the server-side sign-out first — if it fails (offline, say),
+  // the session is still live and the local cache/reminders are still
+  // valid, so nothing should be thrown away yet.
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  await clearLocalUserData();
 }
 
 // Everything this device holds about the signed-in user beyond the auth
@@ -59,8 +62,11 @@ export async function deleteMyAccount() {
     const { error } = await supabase.storage.from(DOCUMENTS_BUCKET).remove(docPaths);
     if (error) throw error;
   }
-  // No avatar is fine — remove() just reports nothing removed.
-  await supabase.storage.from(AVATARS_BUCKET).remove([user.id]);
+  // No avatar is fine — remove() just reports nothing removed when the
+  // object doesn't exist. A real failure (network, permissions) still
+  // needs to stop deletion, same as the documents removal above.
+  const { error: avatarError } = await supabase.storage.from(AVATARS_BUCKET).remove([user.id]);
+  if (avatarError) throw avatarError;
 
   const { error } = await supabase.rpc("delete_my_account");
   if (error) throw error;
@@ -271,7 +277,10 @@ export async function deleteTrip(id: string) {
   } = await supabase.auth.getUser();
   if (user) {
     const paths = await listDocumentPaths(user.id, id);
-    if (paths.length) await supabase.storage.from(DOCUMENTS_BUCKET).remove(paths);
+    if (paths.length) {
+      const { error } = await supabase.storage.from(DOCUMENTS_BUCKET).remove(paths);
+      if (error) throw error;
+    }
   }
   const { error } = await supabase.from("trips").delete().eq("id", id);
   if (error) throw error;
@@ -286,13 +295,18 @@ export async function deleteTrip(id: string) {
 const DOCUMENTS_BUCKET = "trip-documents";
 const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB, matches the bucket limit
 
+// A failed list() must not be mistaken for "no documents" — deleteMyAccount
+// and deleteTrip both rely on an empty array here meaning there is
+// genuinely nothing to remove, so a real error has to throw instead.
 async function listDocumentPaths(userId: string, tripId: string) {
-  const { data } = await supabase.storage.from(DOCUMENTS_BUCKET).list(`${userId}/${tripId}`, { limit: 1000 });
+  const { data, error } = await supabase.storage.from(DOCUMENTS_BUCKET).list(`${userId}/${tripId}`, { limit: 1000 });
+  if (error) throw error;
   return (data || []).map((f) => `${userId}/${tripId}/${f.name}`);
 }
 
 async function listAllDocumentPaths(userId: string) {
-  const { data: folders } = await supabase.storage.from(DOCUMENTS_BUCKET).list(userId, { limit: 1000 });
+  const { data: folders, error } = await supabase.storage.from(DOCUMENTS_BUCKET).list(userId, { limit: 1000 });
+  if (error) throw error;
   const paths: string[] = [];
   for (const folder of folders || []) {
     paths.push(...(await listDocumentPaths(userId, folder.name)));

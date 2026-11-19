@@ -116,10 +116,7 @@ export default function TripHubScreen() {
         <PlaceBanner
           placeName={photoQuery(trip)}
           savedUrl={trip.photo_url}
-          onResolved={(url) => {
-            setTrip((t: any) => ({ ...t, photo_url: url }));
-            updateTrip(tripId, { photo_url: url }).catch(() => {});
-          }}
+          onResolved={(url) => save("photo_url")(url)}
           height={160}
           style={{ borderRadius: radius.lg }}
         >

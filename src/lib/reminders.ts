@@ -16,10 +16,11 @@ import { enumerateDates } from "./dates";
 
 const LEAD_MINUTES = 60;
 const MAX_PER_TRIP = 30;
+const MAX_APP_WIDE = 64;
 const CHANNEL_ID = "trip-reminders";
 const KEY_PREFIX = "reminders:";
 
-type ReminderState = { enabled: boolean; ids: string[] };
+type ReminderState = { enabled: boolean; ids: string[]; signature?: string };
 
 let initialized = false;
 
@@ -79,7 +80,34 @@ function toLocalDate(date: string, time: string) {
   return d;
 }
 
-function buildReminders(trip: any) {
+// How many reminders every *other* trip currently has scheduled, so one
+// trip's sync can stay within the shared app-wide cap instead of only
+// capping itself.
+async function countOtherTripReminders(excludeTripId: string) {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const tripKeys = keys.filter((k) => k.startsWith(KEY_PREFIX) && k !== KEY_PREFIX + excludeTripId);
+    if (!tripKeys.length) return 0;
+    const entries = await AsyncStorage.multiGet(tripKeys);
+    return entries.reduce((sum, [, raw]) => {
+      if (!raw) return sum;
+      try {
+        const state: ReminderState = JSON.parse(raw);
+        return sum + (state.ids?.length || 0);
+      } catch (e) {
+        return sum;
+      }
+    }, 0);
+  } catch (e) {
+    return 0;
+  }
+}
+
+function signatureOf(reminders: { fireAt: Date; title: string }[]) {
+  return reminders.map((r) => `${r.fireAt.getTime()}|${r.title}`).join(";");
+}
+
+function buildReminders(trip: any, limit: number) {
   const items = (trip.itinerary || []).filter((it: any) => it.date && it.time);
   const days = trip.start_date && trip.end_date ? enumerateDates(trip.start_date, trip.end_date) : [];
   const firstTimeByDate: Record<string, string> = {};
@@ -105,7 +133,7 @@ function buildReminders(trip: any) {
     })
     .filter(Boolean)
     .sort((a: any, b: any) => a.fireAt.getTime() - b.fireAt.getTime())
-    .slice(0, MAX_PER_TRIP) as { fireAt: Date; title: string; body: string; tripId: string }[];
+    .slice(0, limit) as { fireAt: Date; title: string; body: string; tripId: string }[];
 }
 
 async function cancelIds(ids: string[]) {
@@ -113,27 +141,38 @@ async function cancelIds(ids: string[]) {
 }
 
 // Re-schedules a trip's reminders from its current itinerary. No-op if the
-// user hasn't turned reminders on for this trip. Returns how many are set.
+// user hasn't turned reminders on for this trip, and a no-op if nothing
+// about the reminder set would actually change (e.g. a focus-triggered
+// resync with no itinerary edits). Returns how many are set.
 export async function syncTripReminders(trip: any) {
   const state = await readState(trip.id);
   if (!state.enabled) return 0;
   initNotifications();
+
+  const otherCount = await countOtherTripReminders(trip.id);
+  const budget = Math.max(0, Math.min(MAX_PER_TRIP, MAX_APP_WIDE - otherCount));
+  const reminders = buildReminders(trip, budget);
+  const signature = signatureOf(reminders);
+
+  if (signature === state.signature && state.ids.length === reminders.length) {
+    return state.ids.length;
+  }
+
   await cancelIds(state.ids);
-  const ids: string[] = [];
-  for (const r of buildReminders(trip)) {
-    try {
-      const id = await Notifications.scheduleNotificationAsync({
+  const scheduled = await Promise.all(
+    reminders.map((r) =>
+      Notifications.scheduleNotificationAsync({
         content: { title: r.title, body: r.body, data: { tripId: r.tripId } },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: r.fireAt,
           channelId: CHANNEL_ID,
         },
-      });
-      ids.push(id);
-    } catch (e) {}
-  }
-  await writeState(trip.id, { enabled: true, ids });
+      }).catch(() => null)
+    )
+  );
+  const ids = scheduled.filter((id): id is string => !!id);
+  await writeState(trip.id, { enabled: true, ids, signature });
   return ids.length;
 }
 

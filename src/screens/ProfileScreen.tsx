@@ -192,7 +192,10 @@ export default function ProfileScreen({ session, navigation }: any) {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={styles.signOutButton} onPress={() => signOut().catch(() => {})}>
+        <TouchableOpacity
+          style={styles.signOutButton}
+          onPress={() => signOut().catch((err: any) => Alert.alert("Couldn't sign out", err.message || "Check your connection and try again."))}
+        >
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
 
