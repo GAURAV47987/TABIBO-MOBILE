@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { Camera, MapPin, Utensils } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
 import { colors, radius, spacing } from "../theme";
@@ -7,6 +7,7 @@ import { enumerateDates } from "../lib/dates";
 import { getEffectiveStops, getStopForDate } from "../lib/stops";
 import ItemModal from "./ItemModal";
 import AIGenerateCard from "./AIGenerateCard";
+import DateField from "./DateField";
 
 function formatDay(dateStr: string, dayNumber: number) {
   const d = new Date(dateStr + "T00:00:00");
@@ -30,14 +31,10 @@ function SetDatesPrompt({ onSet }: { onSet: (startDate: string) => Promise<void>
     <View style={styles.datesCard}>
       <Text style={styles.datesTitle}>When are you going?</Text>
       <Text style={styles.datesSubtitle}>Add a start date to build your day-by-day itinerary.</Text>
-      <TextInput
-        style={styles.dateInput}
-        value={startDate}
-        onChangeText={setStartDate}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor={colors.textFaint}
-      />
-      <TouchableOpacity style={[styles.saveDatesButton, busy && { opacity: 0.6 }]} onPress={submit} disabled={busy}>
+      <View style={{ marginBottom: spacing(3) }}>
+        <DateField value={startDate} onChange={setStartDate} placeholder="Select a start date" />
+      </View>
+      <TouchableOpacity style={[styles.saveDatesButton, (busy || !startDate) && { opacity: 0.6 }]} onPress={submit} disabled={busy || !startDate}>
         <Text style={styles.saveDatesText}>{busy ? "Saving…" : "Save dates"}</Text>
       </TouchableOpacity>
     </View>
@@ -167,17 +164,6 @@ const styles = StyleSheet.create({
   },
   datesTitle: { fontWeight: "600", color: colors.textPrimary, marginBottom: spacing(1) },
   datesSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: spacing(3) },
-  dateInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-    color: colors.textBody,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 16,
-    marginBottom: spacing(3),
-  },
   saveDatesButton: { backgroundColor: colors.primaryBg, borderRadius: radius.md, paddingVertical: spacing(2.5), alignItems: "center" },
   saveDatesText: { color: colors.primaryText, fontWeight: "600" },
   dayCard: {

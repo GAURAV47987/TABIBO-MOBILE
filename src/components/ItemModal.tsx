@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
 import { colors, radius, spacing } from "../theme";
 import { geocodeDestination } from "../lib/geocode";
+import TimeField from "./TimeField";
 
 export default function ItemModal({
   date,
@@ -63,13 +64,9 @@ export default function ItemModal({
           <Text style={styles.title}>{initial ? "Edit plan" : "Add to itinerary"}</Text>
 
           <Text style={styles.label}>Time (optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={time}
-            onChangeText={setTime}
-            placeholder="14:30"
-            placeholderTextColor={colors.textFaint}
-          />
+          <View style={{ marginBottom: spacing(3) }}>
+            <TimeField value={time} onChange={setTime} placeholder="Select a time" />
+          </View>
 
           <Text style={styles.label}>What's happening?</Text>
           <TextInput

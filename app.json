@@ -26,6 +26,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TABIGO uses your photos to let you set a profile picture."
+        }
+      ]
+    ]
   }
 }

@@ -6,6 +6,7 @@ import { colors, radius, spacing } from "../theme";
 import { listTrips, deleteTrip, updateTrip } from "../lib/supabase";
 import { getEffectiveStops } from "../lib/stops";
 import PlaceBanner from "../components/PlaceBanner";
+import AppHeader from "../components/AppHeader";
 
 // A joined multi-stop label ("Athens -> Paris") won't resolve to any one
 // photo, so photos always key off the first stop's plain name.
@@ -74,30 +75,41 @@ export default function TripsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.primaryBg} size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <AppHeader />
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primaryBg} size="large" />
+        </View>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Couldn't load your trips: {error}</Text>
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <AppHeader />
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Couldn't load your trips: {error}</Text>
+        </View>
       </View>
     );
   }
 
   if (trips.length === 0) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.emptyText}>No trips yet — tap + below to plan your first one.</Text>
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <AppHeader />
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>No trips yet — tap + below to plan your first one.</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <FlatList
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <AppHeader />
+      <FlatList
       data={trips}
       keyExtractor={(t) => t.id}
       numColumns={2}
@@ -133,7 +145,8 @@ export default function TripsScreen() {
           </PlaceBanner>
         </TouchableOpacity>
       )}
-    />
+      />
+    </View>
   );
 }
 

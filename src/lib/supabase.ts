@@ -44,6 +44,41 @@ export async function resetPasswordForEmail(email: string) {
   if (error) throw error;
 }
 
+export async function changePassword(newPassword: string) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
+
+const AVATARS_BUCKET = "avatars";
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
+
+// Same bucket/filename convention as the web app (src/supabase.js) — the
+// object's filename is always the user's own id, so re-uploading replaces
+// the old photo and the public URL never changes.
+export function getAvatarUrl(userId: string) {
+  const { data } = supabase.storage.from(AVATARS_BUCKET).getPublicUrl(userId);
+  return `${data.publicUrl}?t=${Date.now()}`;
+}
+
+// expo-image-picker hands back a local file URI, not a File/Blob — fetch()
+// against that URI and read it as an ArrayBuffer is the standard React
+// Native way to get bytes Supabase storage's upload() will accept.
+export async function uploadAvatar(uri: string, mimeType: string) {
+  const response = await fetch(uri);
+  const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > MAX_AVATAR_SIZE) throw new Error("Photo is too large (max 5MB)");
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+  const { error } = await supabase.storage.from(AVATARS_BUCKET).upload(user.id, arrayBuffer, {
+    upsert: true,
+    contentType: mimeType,
+  });
+  if (error) throw error;
+  return getAvatarUrl(user.id);
+}
+
 export async function getSession() {
   const {
     data: { session },
@@ -110,6 +145,16 @@ export async function listTrips() {
   return data;
 }
 
+// Admin-only: every trip from every user, with the owner's email. The
+// admin_list_trips function checks the caller's email server-side before
+// returning anything, so this fails for anyone else regardless of what
+// the client sends.
+export async function listAllTripsAsAdmin() {
+  const { data, error } = await supabase.rpc("admin_list_trips");
+  if (error) throw error;
+  return data;
+}
+
 export async function getTrip(id: string) {
   const { data, error } = await supabase.from("trips").select("*").eq("id", id).single();
   if (error) throw error;
@@ -158,4 +203,29 @@ export async function generateItinerary({ stops }: { stops: { name: string; days
   if (error) throw await friendlyFunctionError(error);
   if (data?.error) throw new Error(data.error);
   return data; // { days: [{ day, items: [{ time, title, notes, type }] }] }
+}
+
+// Shared cache (place_suggestions table) the same way place_photos is —
+// only the first person asking about a destination pays the Gemini-call
+// cost, everyone after gets it instantly. Same backend function as web.
+export async function suggestPopularPlaces(destination: string) {
+  const key = destination.trim().toLowerCase();
+  try {
+    const { data: cached } = await supabase.from("place_suggestions").select("places").eq("name", key).maybeSingle();
+    if (cached) return cached.places;
+  } catch (e) {
+    // Shared cache unreachable — fall through to a live call.
+  }
+
+  const { data, error } = await supabase.functions.invoke("rapid-function", {
+    body: { mode: "suggest_places", destination },
+  });
+  if (error) throw await friendlyFunctionError(error);
+  if (data?.error) throw new Error(data.error);
+  const places = data.places; // [{ name, reason }]
+  supabase.from("place_suggestions").upsert({ name: key, places }).then(
+    () => {},
+    () => {}
+  );
+  return places;
 }

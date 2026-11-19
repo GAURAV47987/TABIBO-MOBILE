@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { Plus, Wallet, X, Trash2 } from "lucide-react-native";
+import { Plus, Wallet, X, Trash2, Printer } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { colors, radius, spacing } from "../theme";
 import { CATEGORIES, CATEGORY_COLOR, CURRENCIES, CURRENCY_SYMBOL } from "../lib/constants";
 import { useFxRates } from "../lib/fx";
@@ -84,6 +86,48 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
     return selectedCategory ? reversed.filter((e: any) => e.category === selectedCategory) : reversed;
   }, [budget, selectedCategory]);
 
+  const exportPDF = async () => {
+    const today = new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const row = (cols: string[]) => `<tr>${cols.map((c) => `<td>${c}</td>`).join("")}</tr>`;
+    const table = (head: string[], rows: string[][]) => `
+      <table>
+        <thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map(row).join("")}</tbody>
+      </table>`;
+
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #222; padding: 24px; }
+            h1 { font-size: 20px; margin: 0 0 4px; }
+            .meta { color: #888; font-size: 12px; margin-bottom: 16px; }
+            .total { font-size: 15px; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+            th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+            th { background: #B23A2E; color: #fff; }
+          </style>
+        </head>
+        <body>
+          <h1>${trip.destination_name} — Budget Summary</h1>
+          <p class="meta">Generated ${today}</p>
+          <p class="total">Total: ${CURRENCY_SYMBOL[homeCurrency]}${fmt(totalHome)} ${homeCurrency} (approx.)</p>
+          ${table(["Currency", "Total"], Object.entries(totals).map(([cur, amt]) => [cur, `${CURRENCY_SYMBOL[cur]}${fmt(amt as number, 2)}`]))}
+          ${table(["Category", `Total (${homeCurrency})`], sortedCategories.map((cat) => [cat, `${CURRENCY_SYMBOL[homeCurrency]}${fmt(categoryTotals[cat], 2)}`]))}
+          ${table(
+            ["Description", "Category", "Amount"],
+            [...budget].reverse().map((e: any) => [e.description, e.category, `${CURRENCY_SYMBOL[e.currency]}${fmt(parseFloat(e.amount), 2)} ${e.currency}`])
+          )}
+        </body>
+      </html>`;
+
+    const { uri } = await Print.printToFileAsync({ html });
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Budget PDF" });
+    }
+  };
+
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
       <TouchableOpacity style={styles.addButton} onPress={openNew}>
@@ -118,6 +162,13 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
           </View>
         ))}
       </View>
+
+      {budget.length > 0 && (
+        <TouchableOpacity style={styles.exportButton} onPress={exportPDF}>
+          <Printer size={16} color={colors.textPrimary} />
+          <Text style={styles.exportButtonText}>Export as PDF</Text>
+        </TouchableOpacity>
+      )}
 
       {sortedCategories.length > 0 && (
         <View style={{ marginBottom: spacing(5) }}>
@@ -277,6 +328,19 @@ const styles = StyleSheet.create({
   },
   currencyLabel: { fontSize: 11, color: colors.textMuted },
   currencyAmount: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
+  exportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing(2),
+    borderRadius: radius.lg,
+    paddingVertical: spacing(3),
+    marginBottom: spacing(5),
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  exportButtonText: { fontSize: 14, fontWeight: "500", color: colors.textPrimary },
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: spacing(1.5), marginBottom: spacing(2) },
   sectionTitle: { fontSize: 14, fontWeight: "600", color: colors.textPrimary },
   categoryCard: {

@@ -17,6 +17,8 @@ import TripsScreen from "./src/screens/TripsScreen";
 import TripHubScreen from "./src/screens/TripHubScreen";
 import NewTripScreen from "./src/screens/NewTripScreen";
 import TemplatePreviewScreen from "./src/screens/TemplatePreviewScreen";
+import ProfileScreen from "./src/screens/ProfileScreen";
+import AdminScreen from "./src/screens/AdminScreen";
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -103,6 +105,10 @@ export default function App() {
               <RootStack.Screen name="TripHub" component={TripHubScreen} />
               <RootStack.Screen name="NewTrip" component={NewTripScreen} options={{ presentation: "modal" }} />
               <RootStack.Screen name="TemplatePreview" component={TemplatePreviewScreen} options={{ presentation: "modal" }} />
+              <RootStack.Screen name="Profile" options={{ presentation: "modal" }}>
+                {({ navigation }) => <ProfileScreen session={session} navigation={navigation} />}
+              </RootStack.Screen>
+              <RootStack.Screen name="Admin" component={AdminScreen} options={{ presentation: "modal" }} />
             </RootStack.Navigator>
           ) : (
             <AuthScreen />
