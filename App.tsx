@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator, TouchableOpacity, StyleSheet } from "react-native";
-import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
+import { NavigationContainer, createNavigationContainerRef, useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, Luggage, Compass, Plus } from "lucide-react-native";
 import type { Session } from "@supabase/supabase-js";
 import { getSession, onAuthStateChange } from "./src/lib/supabase";
@@ -45,58 +45,48 @@ function openTripFromNotification(response: Notifications.NotificationResponse |
   }
 }
 
-// The center tab never actually shows a screen — tapping it just opens
-// NewTrip as a modal on the root stack, same as the web app's raised "+"
-// FAB on the Dashboard's bottom bar.
-function CreateTabPlaceholder() {
-  return null;
-}
-
+// The "+" isn't one of the flex tabs — with Home/Trips/Explore as real
+// tabs, a 4th tab for it would sit at the 3rd-of-4 slot (62.5% across),
+// not screen center. It's rendered as a sibling overlay instead, always
+// centered regardless of how many tabs are either side of it.
 function MainTabs() {
+  const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.stamp,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
-      />
-      <Tab.Screen
-        name="Trips"
-        component={TripsScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Luggage color={color} size={size} /> }}
-      />
-      <Tab.Screen
-        name="Create"
-        component={CreateTabPlaceholder}
-        options={{
-          tabBarIcon: () => (
-            <View style={styles.fab}>
-              <Plus color="#fff" size={26} strokeWidth={2.5} />
-            </View>
-          ),
-          tabBarLabel: () => null,
+    <View style={{ flex: 1 }}>
+      <Tab.Navigator
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.stamp,
+          tabBarInactiveTintColor: colors.textMuted,
+          tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
         }}
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            e.preventDefault();
-            navigation.getParent()?.navigate("NewTrip");
-          },
-        })}
-      />
-      <Tab.Screen
-        name="Explore"
-        options={{ tabBarIcon: ({ color, size }) => <Compass color={color} size={size} /> }}
       >
-        {() => <PlaceholderScreen label="Explore is coming soon." />}
-      </Tab.Screen>
-    </Tab.Navigator>
+        <Tab.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{ tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
+        />
+        <Tab.Screen
+          name="Trips"
+          component={TripsScreen}
+          options={{ tabBarIcon: ({ color, size }) => <Luggage color={color} size={size} /> }}
+        />
+        <Tab.Screen
+          name="Explore"
+          options={{ tabBarIcon: ({ color, size }) => <Compass color={color} size={size} /> }}
+        >
+          {() => <PlaceholderScreen label="Explore is coming soon." />}
+        </Tab.Screen>
+      </Tab.Navigator>
+      <TouchableOpacity
+        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        onPress={() => navigation.getParent()?.navigate("NewTrip")}
+        accessibilityLabel="Create new trip"
+      >
+        <Plus color="#fff" size={26} strokeWidth={2.5} />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -173,13 +163,15 @@ function App() {
 
 const styles = StyleSheet.create({
   fab: {
+    position: "absolute",
+    left: "50%",
+    marginLeft: -26,
     width: 52,
     height: 52,
     borderRadius: 26,
     backgroundColor: colors.primaryBg,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -20,
     shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 6,
