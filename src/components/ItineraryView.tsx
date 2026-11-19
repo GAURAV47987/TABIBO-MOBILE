@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, LayoutAnimation } from "react-native";
-import { Camera, MapPin, Utensils, Bell, BellOff, Printer } from "lucide-react-native";
+import { Camera, MapPin, Utensils, Bell, BellOff, Printer, ChevronUp, ChevronDown } from "lucide-react-native";
 import { areTripRemindersEnabled, enableTripReminders, cancelTripReminders } from "../lib/reminders";
 import { randomUUID } from "expo-crypto";
 import { colors, radius, spacing } from "../theme";
@@ -11,6 +11,19 @@ import { haptics } from "../lib/haptics";
 import ItemModal from "./ItemModal";
 import AIGenerateCard from "./AIGenerateCard";
 import DateField from "./DateField";
+
+// Manual drag/reorder order wins when set (lower first); items that have
+// never been reordered (order undefined, including every item created
+// before this feature existed) fall back to a time-string sort among
+// themselves, same as before.
+function sortDayItems(items: any[]) {
+  return [...items].sort((a, b) => {
+    const oa = a.order ?? Infinity;
+    const ob = b.order ?? Infinity;
+    if (oa !== ob) return oa - ob;
+    return (a.time || "99:99").localeCompare(b.time || "99:99");
+  });
+}
 
 function formatDay(dateStr: string, dayNumber: number) {
   const d = new Date(dateStr + "T00:00:00");
@@ -51,6 +64,7 @@ function DayCard({
   items,
   onAdd,
   onEdit,
+  onReorder,
 }: {
   date: string;
   dayNumber: number;
@@ -58,8 +72,19 @@ function DayCard({
   items: any[];
   onAdd: (date: string) => void;
   onEdit: (item: any) => void;
+  onReorder: (orderedIds: string[]) => void;
 }) {
-  const sorted = [...items].sort((a, b) => (a.time || "99:99").localeCompare(b.time || "99:99"));
+  const sorted = sortDayItems(items);
+
+  const move = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= sorted.length) return;
+    const reordered = [...sorted];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    haptics.select();
+    onReorder(reordered.map((it) => it.id));
+  };
 
   return (
     <View style={styles.dayCard}>
@@ -77,17 +102,37 @@ function DayCard({
         <Text style={styles.emptyDay}>Nothing planned yet.</Text>
       ) : (
         <View style={{ gap: spacing(2) }}>
-          {sorted.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.item} onPress={() => onEdit(item)}>
-              <View style={styles.itemRow}>
-                {item.type === "photo" && <Camera size={14} color={colors.stamp} />}
-                {item.type === "food" && <Utensils size={14} color={colors.textSecondary} />}
-                {item.time ? <Text style={styles.itemTime}>{item.time}</Text> : null}
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                {item.lat != null && <MapPin size={12} color={colors.textMuted} />}
-              </View>
-              {item.notes ? <Text style={styles.itemNotes}>{item.notes}</Text> : null}
-            </TouchableOpacity>
+          {sorted.map((item, index) => (
+            <View key={item.id} style={styles.itemWrap}>
+              <TouchableOpacity style={styles.item} onPress={() => onEdit(item)}>
+                <View style={styles.itemRow}>
+                  {item.type === "photo" && <Camera size={14} color={colors.stamp} />}
+                  {item.type === "food" && <Utensils size={14} color={colors.textSecondary} />}
+                  {item.time ? <Text style={styles.itemTime}>{item.time}</Text> : null}
+                  <Text style={styles.itemTitle}>{item.title}</Text>
+                  {item.lat != null && <MapPin size={12} color={colors.textMuted} />}
+                </View>
+                {item.notes ? <Text style={styles.itemNotes}>{item.notes}</Text> : null}
+              </TouchableOpacity>
+              {sorted.length > 1 && (
+                <View style={styles.reorderCol}>
+                  <TouchableOpacity
+                    disabled={index === 0}
+                    onPress={() => move(index, -1)}
+                    hitSlop={{ top: 6, bottom: 2, left: 10, right: 10 }}
+                  >
+                    <ChevronUp size={16} color={index === 0 ? colors.textFaint : colors.textMuted} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={index === sorted.length - 1}
+                    onPress={() => move(index, 1)}
+                    hitSlop={{ top: 2, bottom: 6, left: 10, right: 10 }}
+                  >
+                    <ChevronDown size={16} color={index === sorted.length - 1 ? colors.textFaint : colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           ))}
         </View>
       )}
@@ -102,9 +147,7 @@ async function exportItineraryPDF(trip: any) {
   const dayBlocks = days
     .map((date, i) => {
       const stop = stops.length > 1 ? getStopForDate(stops, date)?.name : null;
-      const dayItems = items
-        .filter((it: any) => it.date === date)
-        .sort((a: any, b: any) => (a.time || "99:99").localeCompare(b.time || "99:99"));
+      const dayItems = sortDayItems(items.filter((it: any) => it.date === date));
       const rows = dayItems.length
         ? dayItems
             .map(
@@ -239,7 +282,11 @@ export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any;
     if (fields.id) {
       next = items.map((it: any) => (it.id === fields.id ? { ...it, ...fields } : it));
     } else {
-      next = [...items, { ...fields, id: randomUUID() }];
+      // New items join the end of their day's manual order, same place a
+      // plain time-sort would already put something with no time set.
+      const dayOrders = items.filter((it: any) => it.date === fields.date).map((it: any) => it.order ?? -1);
+      const order = dayOrders.length ? Math.max(...dayOrders) + 1 : 0;
+      next = [...items, { ...fields, order, id: randomUUID() }];
     }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     haptics.success();
@@ -252,6 +299,12 @@ export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any;
     haptics.press();
     onSave(items.filter((it: any) => it.id !== id));
     closeModal();
+  };
+
+  const handleReorder = (date: string, orderedIds: string[]) => {
+    const indexById = new Map(orderedIds.map((id, i) => [id, i]));
+    const next = items.map((it: any) => (it.date === date && indexById.has(it.id) ? { ...it, order: indexById.get(it.id) } : it));
+    onSave(next);
   };
 
   return (
@@ -271,6 +324,7 @@ export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any;
             setModalDate(item.date);
             setEditingItem(item);
           }}
+          onReorder={(orderedIds) => handleReorder(date, orderedIds)}
         />
       ))}
 
@@ -323,9 +377,11 @@ const styles = StyleSheet.create({
   dayStop: { fontSize: 12, color: colors.textMuted },
   addLink: { fontSize: 14, color: colors.textSecondary, textDecorationLine: "underline" },
   emptyDay: { fontSize: 14, color: colors.textFaint },
-  item: { paddingHorizontal: spacing(3), paddingVertical: spacing(2), borderRadius: radius.md, backgroundColor: colors.bg },
+  itemWrap: { flexDirection: "row", alignItems: "stretch", gap: spacing(1) },
+  item: { flex: 1, paddingHorizontal: spacing(3), paddingVertical: spacing(2), borderRadius: radius.md, backgroundColor: colors.bg },
   itemRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.5) },
   itemTime: { fontWeight: "600", color: colors.textBody, marginRight: spacing(1) },
   itemTitle: { color: colors.textBody, flexShrink: 1 },
   itemNotes: { fontSize: 13, color: colors.textSecondary, marginTop: spacing(0.5) },
+  reorderCol: { justifyContent: "center", alignItems: "center", gap: spacing(1), paddingHorizontal: spacing(0.5) },
 });
