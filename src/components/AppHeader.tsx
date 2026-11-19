@@ -1,14 +1,18 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Text, TouchableOpacity, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { User } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
 
 // Shared top bar for the Home and Trips tabs — mirrors the web Dashboard's
 // header (logo + profile button, admin link added once isAdmin lands here).
+// SafeAreaView (not a plain View) keeps it clear of the notch/status bar —
+// a fixed paddingTop here previously rendered under the system clock on
+// notched phones.
 export default function AppHeader() {
   const navigation = useNavigation<any>();
   return (
-    <View style={styles.row}>
+    <SafeAreaView edges={["top"]} style={styles.row}>
       <Text style={styles.logo}>TABIGO</Text>
       <TouchableOpacity
         onPress={() => navigation.getParent()?.navigate("Profile")}
@@ -17,7 +21,7 @@ export default function AppHeader() {
       >
         <User size={16} color={colors.textPrimary} />
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -27,7 +31,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: spacing(4),
-    paddingTop: spacing(6),
+    paddingTop: spacing(3),
     paddingBottom: spacing(3),
   },
   logo: { fontSize: 22, fontWeight: "800", color: colors.primaryBg, letterSpacing: 0.5 },
