@@ -7,9 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "backgroundColor": "#FBF8FF",
-    "splash": {
-      "backgroundColor": "#FBF8FF"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tabigo.app"
@@ -42,7 +39,16 @@
           "defaultChannel": "trip-reminders"
         }
       ],
-      "@sentry/react-native"
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FBF8FF"
+        }
+      ],
+      "@sentry/react-native",
+      "@react-native-community/datetimepicker",
+      "expo-sharing",
+      "expo-status-bar"
     ]
   }
 }
