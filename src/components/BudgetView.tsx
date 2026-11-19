@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, LayoutAnimation } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { Plus, Wallet, X, Trash2, Printer } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
@@ -7,6 +7,8 @@ import { colors, radius, spacing } from "../theme";
 import { CATEGORIES, CATEGORY_COLOR, CURRENCIES, CURRENCY_SYMBOL } from "../lib/constants";
 import { useFxRates } from "../lib/fx";
 import { escapeHtml, exportHtmlAsPdf } from "../lib/pdf";
+import { haptics } from "../lib/haptics";
+import PressScale from "./PressScale";
 
 function fmt(n: number, maxFractionDigits = 0) {
   return n.toLocaleString(undefined, { maximumFractionDigits: maxFractionDigits });
@@ -73,12 +75,18 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
     } else {
       next = [...budget, { ...form, id: randomUUID() }];
     }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    haptics.success();
     onSave(next);
     setShowForm(false);
     setEditingId(null);
   };
 
-  const removeExpense = (id: string) => onSave(budget.filter((e: any) => e.id !== id));
+  const removeExpense = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    haptics.press();
+    onSave(budget.filter((e: any) => e.id !== id));
+  };
 
   const visibleExpenses = useMemo(() => {
     const reversed = [...budget].reverse();
@@ -130,10 +138,10 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
-      <TouchableOpacity style={styles.addButton} onPress={openNew}>
+      <PressScale style={styles.addButton} onPress={openNew}>
         <Plus size={20} color="#fff" strokeWidth={3} />
         <Text style={styles.addButtonText}>ADD EXPENSE</Text>
-      </TouchableOpacity>
+      </PressScale>
 
       {Object.keys(totals).length > 0 && (
         <View style={styles.totalCard}>
@@ -275,9 +283,9 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
               </Picker>
             </View>
 
-            <TouchableOpacity style={styles.submitButton} onPress={submit}>
+            <PressScale style={styles.submitButton} onPress={submit}>
               <Text style={styles.submitText}>{editingId ? "Save changes" : "Add expense"}</Text>
-            </TouchableOpacity>
+            </PressScale>
           </View>
         </View>
       </Modal>

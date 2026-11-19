@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, LayoutAnimation } from "react-native";
 import { Luggage, CheckCircle2, Circle } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
 import { buildPackingCategories } from "../lib/constants";
 import { getTripClimate } from "../lib/weather";
+import { haptics } from "../lib/haptics";
 import ProgressRing from "./ProgressRing";
 
 export default function PackingView({ trip, onSave }: { trip: any; onSave: (packing: Record<string, boolean>) => void }) {
@@ -40,7 +41,11 @@ export default function PackingView({ trip, onSave }: { trip: any; onSave: (pack
 
   const pct = totalItems > 0 ? (checkedCount / totalItems) * 100 : 0;
 
-  const toggle = (key: string) => onSave({ ...checklist, [key]: !checklist[key] });
+  const toggle = (key: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    haptics.select();
+    onSave({ ...checklist, [key]: !checklist[key] });
+  };
 
   const climateNote = !trip.start_date
     ? "Add your trip dates in the Itinerary tab to get a climate-aware packing list."

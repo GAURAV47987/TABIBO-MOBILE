@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, LayoutAnimation } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Trash2 } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
@@ -7,6 +7,7 @@ import { loadTrips, deleteTrip, updateTrip } from "../lib/supabase";
 import { getEffectiveStops } from "../lib/stops";
 import PlaceBanner from "../components/PlaceBanner";
 import AppHeader from "../components/AppHeader";
+import { haptics } from "../lib/haptics";
 
 // A joined multi-stop label ("Athens -> Paris") won't resolve to any one
 // photo, so photos always key off the first stop's plain name.
@@ -58,6 +59,7 @@ export default function TripsScreen() {
   );
 
   const confirmDelete = (trip: Trip) => {
+    haptics.warning();
     Alert.alert("Delete trip?", `"${trip.destination_name}" and everything in it — itinerary, budget, packing list — will be gone for good.`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -66,8 +68,10 @@ export default function TripsScreen() {
         onPress: async () => {
           try {
             await deleteTrip(trip.id);
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             setTrips((prev) => prev.filter((t) => t.id !== trip.id));
           } catch (err: any) {
+            haptics.error();
             Alert.alert("Couldn't delete trip", err.message || "Something went wrong");
           }
         },

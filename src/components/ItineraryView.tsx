@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, LayoutAnimation } from "react-native";
 import { Camera, MapPin, Utensils, Bell, BellOff, Printer } from "lucide-react-native";
 import { areTripRemindersEnabled, enableTripReminders, cancelTripReminders } from "../lib/reminders";
 import { randomUUID } from "expo-crypto";
@@ -7,6 +7,7 @@ import { colors, radius, spacing } from "../theme";
 import { enumerateDates } from "../lib/dates";
 import { getEffectiveStops, getStopForDate } from "../lib/stops";
 import { escapeHtml, exportHtmlAsPdf } from "../lib/pdf";
+import { haptics } from "../lib/haptics";
 import ItemModal from "./ItemModal";
 import AIGenerateCard from "./AIGenerateCard";
 import DateField from "./DateField";
@@ -166,6 +167,7 @@ function Toolbar({ trip }: { trip: any }) {
 
   const toggleReminders = async () => {
     setBusy(true);
+    haptics.select();
     try {
       if (reminders) {
         await cancelTripReminders(trip.id);
@@ -239,11 +241,15 @@ export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any;
     } else {
       next = [...items, { ...fields, id: randomUUID() }];
     }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    haptics.success();
     onSave(next);
     closeModal();
   };
 
   const handleDelete = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    haptics.press();
     onSave(items.filter((it: any) => it.id !== id));
     closeModal();
   };

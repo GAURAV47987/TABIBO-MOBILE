@@ -4,6 +4,8 @@ import { colors, radius, spacing } from "../theme";
 import { signIn, signUp, resetPasswordForEmail } from "../lib/supabase";
 import { LegalDocument } from "./LegalScreen";
 import type { LegalDocId } from "../lib/legal";
+import { haptics } from "../lib/haptics";
+import PressScale from "../components/PressScale";
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
@@ -25,8 +27,10 @@ export default function AuthScreen() {
       } else {
         await signIn(email.trim(), password);
       }
+      haptics.success();
     } catch (err: any) {
       setError(err.message || "Something went wrong");
+      haptics.error();
     } finally {
       setBusy(false);
     }
@@ -88,9 +92,9 @@ export default function AuthScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <TouchableOpacity style={styles.primaryButton} onPress={submitForgot} disabled={busy}>
+          <PressScale style={styles.primaryButton} onPress={submitForgot} disabled={busy}>
             {busy ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.primaryButtonText}>Send reset link</Text>}
-          </TouchableOpacity>
+          </PressScale>
 
           <TouchableOpacity
             style={styles.linkButton}
@@ -157,9 +161,9 @@ export default function AuthScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <TouchableOpacity style={styles.primaryButton} onPress={submit} disabled={busy}>
+        <PressScale style={styles.primaryButton} onPress={submit} disabled={busy}>
           {busy ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.primaryButtonText}>{mode === "signup" ? "Create account" : "Sign in"}</Text>}
-        </TouchableOpacity>
+        </PressScale>
 
         {mode === "signin" && (
           <TouchableOpacity

@@ -5,6 +5,8 @@ import { User, X } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
 import { signOut, changePassword, getAvatarUrl, uploadAvatar, deleteMyAccount } from "../lib/supabase";
 import { isAdmin } from "../lib/admin";
+import { haptics } from "../lib/haptics";
+import PressScale from "../components/PressScale";
 
 export default function ProfileScreen({ session, navigation }: any) {
   const [avatarUrl, setAvatarUrl] = useState(() => getAvatarUrl(session.user.id));
@@ -22,6 +24,7 @@ export default function ProfileScreen({ session, navigation }: any) {
 
   // Two-step confirm: account deletion is immediate and irreversible.
   const confirmDeleteAccount = () => {
+    haptics.warning();
     Alert.alert(
       "Delete your account?",
       "This permanently deletes your account and everything in it — all trips, itineraries, budgets, documents and photos. This can't be undone.",
@@ -47,11 +50,12 @@ export default function ProfileScreen({ session, navigation }: any) {
       // The auth listener in App.tsx switches to the Auth screen.
     } catch (err: any) {
       setDeleting(false);
+      haptics.error();
       Alert.alert("Couldn't delete account", (err.message || "Something went wrong") + "\n\nCheck your connection and try again.");
     }
   };
 
-  const memberSince =session.user.created_at
+  const memberSince = session.user.created_at
     ? new Date(session.user.created_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
     : null;
 
@@ -96,6 +100,7 @@ export default function ProfileScreen({ session, navigation }: any) {
     setBusy(true);
     try {
       await changePassword(newPassword);
+      haptics.success();
       setSuccess("Password updated");
       setNewPassword("");
       setConfirmPassword("");
@@ -181,9 +186,9 @@ export default function ProfileScreen({ session, navigation }: any) {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {success ? <Text style={styles.successText}>{success}</Text> : null}
 
-          <TouchableOpacity style={[styles.primaryButton, busy && { opacity: 0.6 }]} onPress={submitPassword} disabled={busy}>
+          <PressScale style={[styles.primaryButton, busy && { opacity: 0.6 }]} onPress={submitPassword} disabled={busy}>
             {busy ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.primaryButtonText}>Update password</Text>}
-          </TouchableOpacity>
+          </PressScale>
         </View>
 
         {isAdmin(session) && (
@@ -194,7 +199,13 @@ export default function ProfileScreen({ session, navigation }: any) {
 
         <TouchableOpacity
           style={styles.signOutButton}
-          onPress={() => signOut().catch((err: any) => Alert.alert("Couldn't sign out", err.message || "Check your connection and try again."))}
+          onPress={() => {
+            haptics.warning();
+            signOut().catch((err: any) => {
+              haptics.error();
+              Alert.alert("Couldn't sign out", err.message || "Check your connection and try again.");
+            });
+          }}
         >
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>

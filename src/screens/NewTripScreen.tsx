@@ -10,6 +10,8 @@ import { getTripClimate } from "../lib/weather";
 import { CURRENCIES } from "../lib/constants";
 import DateField from "../components/DateField";
 import PlaceBanner from "../components/PlaceBanner";
+import PressScale from "../components/PressScale";
+import { haptics } from "../lib/haptics";
 
 const STEPS = ["Destination", "Route", "Dates", "Add-ons"];
 
@@ -224,9 +226,11 @@ export default function NewTripScreen({ navigation }: any) {
         homeCurrency,
         stops: dated,
       });
+      haptics.success();
       navigation.replace("MainTabs", { screen: "Trips" });
     } catch (err: any) {
       setError(err.message || "Could not create trip");
+      haptics.error();
     } finally {
       setBusy(false);
     }
@@ -398,7 +402,7 @@ export default function NewTripScreen({ navigation }: any) {
           </TouchableOpacity>
         )}
         {step === 4 && (
-          <TouchableOpacity style={[styles.createButton, busy && { opacity: 0.6 }]} onPress={finalize} disabled={busy}>
+          <PressScale style={[styles.createButton, busy && { opacity: 0.6 }]} onPress={finalize} disabled={busy}>
             {busy ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -407,7 +411,7 @@ export default function NewTripScreen({ navigation }: any) {
                 <Text style={styles.createButtonText}>Create trip</Text>
               </>
             )}
-          </TouchableOpacity>
+          </PressScale>
         )}
       </View>
     </View>

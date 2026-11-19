@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
-import { View, ActivityIndicator, TouchableOpacity, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { NavigationContainer, createNavigationContainerRef, useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -25,6 +25,8 @@ import OnboardingScreen from "./src/screens/OnboardingScreen";
 import { loadFromStorage, saveToStorage } from "./src/lib/storage";
 import { initNotifications } from "./src/lib/reminders";
 import { setMonitoringUser, wrapRoot } from "./src/lib/monitoring";
+import { haptics } from "./src/lib/haptics";
+import PressScale from "./src/components/PressScale";
 
 // Sentry itself is initialized earlier, in instrument.ts (imported first
 // in index.ts) — by the time this module runs, it's already live.
@@ -61,6 +63,7 @@ function MainTabs() {
           tabBarInactiveTintColor: colors.textMuted,
           tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
         }}
+        screenListeners={{ tabPress: () => haptics.select() }}
       >
         <Tab.Screen
           name="Home"
@@ -79,13 +82,13 @@ function MainTabs() {
           {() => <PlaceholderScreen label="Explore is coming soon." />}
         </Tab.Screen>
       </Tab.Navigator>
-      <TouchableOpacity
+      <PressScale
         style={[styles.fab, { bottom: insets.bottom + 20 }]}
         onPress={() => navigation.getParent()?.navigate("NewTrip")}
         accessibilityLabel="Create new trip"
       >
         <Plus color="#fff" size={26} strokeWidth={2.5} />
-      </TouchableOpacity>
+      </PressScale>
     </View>
   );
 }
