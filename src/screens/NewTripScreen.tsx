@@ -12,6 +12,7 @@ import DateField from "../components/DateField";
 import PlaceBanner from "../components/PlaceBanner";
 import PressScale from "../components/PressScale";
 import { haptics } from "../lib/haptics";
+import { scheduleAbandonedPlanningNudge, schedulePostTripNudge } from "../lib/reminders";
 
 const STEPS = ["Destination", "Route", "Dates", "Add-ons"];
 
@@ -217,7 +218,7 @@ export default function NewTripScreen({ navigation }: any) {
       const dated = buildDatedStops(stops, startDate || null);
       const endDate = dated[dated.length - 1]?.endDate || null;
       const autoName = stops.length <= 2 ? stops.map((s) => s.name).join(" → ") : `${stops[0].name} +${stops.length - 1} more`;
-      await createTrip({
+      const trip = await createTrip({
         destinationName: tripName.trim() || autoName,
         lat: dated[0].lat,
         lng: dated[0].lng,
@@ -226,6 +227,8 @@ export default function NewTripScreen({ navigation }: any) {
         homeCurrency,
         stops: dated,
       });
+      scheduleAbandonedPlanningNudge(trip);
+      schedulePostTripNudge(trip);
       haptics.success();
       navigation.replace("MainTabs", { screen: "Trips" });
     } catch (err: any) {

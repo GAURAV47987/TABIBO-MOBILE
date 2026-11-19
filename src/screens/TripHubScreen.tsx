@@ -5,7 +5,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar, Wallet, ArrowLeftRight, Map as MapIcon, Luggage, FileText, WifiOff } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
 import { loadTrip, updateTrip, patchCachedTrip } from "../lib/supabase";
-import { syncTripReminders } from "../lib/reminders";
+import { syncTripReminders, cancelAbandonedPlanningNudge, schedulePostTripNudge } from "../lib/reminders";
+import { haptics } from "../lib/haptics";
 import { getEffectiveStops, buildDatedStops } from "../lib/stops";
 import PlaceBanner from "../components/PlaceBanner";
 import ItineraryView from "../components/ItineraryView";
@@ -84,6 +85,9 @@ export default function TripHubScreen() {
     const dated = buildDatedStops(stops, startDate);
     const endDate = dated[dated.length - 1]?.endDate || null;
     await persist({ start_date: startDate, end_date: endDate, stops: dated }).catch(() => {});
+    haptics.success();
+    cancelAbandonedPlanningNudge(tripId);
+    schedulePostTripNudge({ ...trip, start_date: startDate, end_date: endDate });
   };
 
   if (!trip && loadError) {

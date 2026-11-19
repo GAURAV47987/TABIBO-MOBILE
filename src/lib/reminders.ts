@@ -3,22 +3,38 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { enumerateDates } from "./dates";
 
-// Local, on-device reminders for itinerary items — no push server needed.
-// Each timed itinerary item gets a heads-up LEAD_MINUTES before it starts;
-// the first timed item of each day reads "Day N starts in 1 hour".
+// Local, on-device trip notifications — no push server needed. Under the
+// "Reminders" toggle (syncTripReminders), a trip with dates gets three
+// kinds, all sharing one capped, deduped schedule:
+//   - a heads-up LEAD_MINUTES before each timed itinerary item
+//   - a DIGEST_HOUR morning summary of each day's plan (specially worded
+//     "starts today" on day 1)
+//   - a PACK_REMINDER_HOUR reminder the evening before departure
+// Two more fire automatically for every trip, independent of that toggle,
+// since they're not itinerary-specific: a one-time "still planning?" nudge
+// if a trip goes unplanned for a few days, and a "welcome back" nudge the
+// day after a trip ends.
 //
 // Times are interpreted in the phone's current time zone, which is what a
 // phone shows once it's landed at the destination.
 //
-// iOS keeps at most 64 pending local notifications per app, so each trip
-// schedules only its next MAX_PER_TRIP reminders; the list is re-synced
-// whenever the itinerary changes or the trip is opened.
+// iOS keeps at most 64 pending local notifications per app, so each trip's
+// Reminders schedules only its next MAX_PER_TRIP within whatever budget is
+// left under MAX_APP_WIDE; the list is re-synced whenever the itinerary
+// changes or the trip is opened. The lifecycle nudges below are one each,
+// so they're not folded into that same per-trip budget check — a small
+// simplification given there are far fewer of them than item reminders.
 
 const LEAD_MINUTES = 60;
+const DIGEST_HOUR = 7;
+const PACK_REMINDER_HOUR = 18;
 const MAX_PER_TRIP = 30;
 const MAX_APP_WIDE = 64;
 const CHANNEL_ID = "trip-reminders";
 const KEY_PREFIX = "reminders:";
+const PLANNING_NUDGE_PREFIX = "planningNudge:";
+const POSTTRIP_NUDGE_PREFIX = "posttripNudge:";
+const PLANNING_NUDGE_DELAY_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 
 type ReminderState = { enabled: boolean; ids: string[]; signature?: string };
 
@@ -108,32 +124,63 @@ function signatureOf(reminders: { fireAt: Date; title: string }[]) {
 }
 
 function buildReminders(trip: any, limit: number) {
-  const items = (trip.itinerary || []).filter((it: any) => it.date && it.time);
+  const now = Date.now();
+  const allItems = trip.itinerary || [];
+  const timedItems = allItems.filter((it: any) => it.date && it.time);
   const days = trip.start_date && trip.end_date ? enumerateDates(trip.start_date, trip.end_date) : [];
-  const firstTimeByDate: Record<string, string> = {};
-  for (const it of items) {
-    if (!firstTimeByDate[it.date] || it.time < firstTimeByDate[it.date]) firstTimeByDate[it.date] = it.time;
+  const entries: { fireAt: Date; title: string; body: string; tripId: string }[] = [];
+
+  // 1) Heads-up LEAD_MINUTES before each timed item.
+  for (const it of timedItems) {
+    const startsAt = toLocalDate(it.date, it.time);
+    if (!startsAt) continue;
+    const fireAt = new Date(startsAt.getTime() - LEAD_MINUTES * 60 * 1000);
+    if (fireAt.getTime() <= now) continue;
+    entries.push({ fireAt, title: `In 1 hour: ${it.title}`, body: `${it.time} · ${trip.destination_name}`, tripId: trip.id });
   }
 
-  const now = Date.now();
-  return items
-    .map((it: any) => {
-      const startsAt = toLocalDate(it.date, it.time);
-      if (!startsAt) return null;
-      const fireAt = new Date(startsAt.getTime() - LEAD_MINUTES * 60 * 1000);
-      if (fireAt.getTime() <= now) return null;
-      const dayIndex = days.indexOf(it.date);
-      const isDayStart = firstTimeByDate[it.date] === it.time && dayIndex >= 0;
-      return {
+  // 2) One morning digest per day that's still ahead, summarizing the plan.
+  const itemsByDate: Record<string, any[]> = {};
+  for (const it of allItems) {
+    if (!it.date) continue;
+    (itemsByDate[it.date] ||= []).push(it);
+  }
+  days.forEach((date, i) => {
+    const fireAt = toLocalDate(date, `${String(DIGEST_HOUR).padStart(2, "0")}:00`);
+    if (!fireAt || fireAt.getTime() <= now) return;
+    const dayItems = (itemsByDate[date] || []).slice().sort((a, b) => (a.time || "99:99").localeCompare(b.time || "99:99"));
+    const isFirstDay = i === 0;
+    let title: string;
+    let body: string;
+    if (dayItems.length === 0) {
+      title = isFirstDay ? `Your trip to ${trip.destination_name} starts today!` : `Day ${i + 1} is wide open`;
+      body = isFirstDay ? "Safe travels! Nothing's on the plan yet — add something from the Itinerary tab." : "Nothing planned — tap to add something.";
+    } else {
+      const first = dayItems[0];
+      title = isFirstDay
+        ? `Your trip to ${trip.destination_name} starts today!`
+        : `Day ${i + 1}: ${dayItems.length} thing${dayItems.length > 1 ? "s" : ""} planned`;
+      body = first.time ? `First up: ${first.time} · ${first.title}` : first.title;
+    }
+    entries.push({ fireAt, title, body, tripId: trip.id });
+  });
+
+  // 3) Pack reminder, the evening before departure.
+  if (trip.start_date) {
+    const dayBefore = new Date(new Date(trip.start_date + "T00:00:00").getTime() - 24 * 60 * 60 * 1000);
+    const fireAt = new Date(dayBefore);
+    fireAt.setHours(PACK_REMINDER_HOUR, 0, 0, 0);
+    if (fireAt.getTime() > now) {
+      entries.push({
         fireAt,
-        title: isDayStart ? `Day ${dayIndex + 1} starts in 1 hour` : `In 1 hour: ${it.title}`,
-        body: `${it.time} · ${isDayStart ? it.title : trip.destination_name}`,
+        title: `Pack for ${trip.destination_name} — you leave tomorrow!`,
+        body: "Check your packing list before you go.",
         tripId: trip.id,
-      };
-    })
-    .filter(Boolean)
-    .sort((a: any, b: any) => a.fireAt.getTime() - b.fireAt.getTime())
-    .slice(0, limit) as { fireAt: Date; title: string; body: string; tripId: string }[];
+      });
+    }
+  }
+
+  return entries.sort((a, b) => a.fireAt.getTime() - b.fireAt.getTime()).slice(0, limit);
 }
 
 async function cancelIds(ids: string[]) {
@@ -195,6 +242,82 @@ export async function cancelAllTripReminders() {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
     const keys = await AsyncStorage.getAllKeys();
-    await AsyncStorage.multiRemove(keys.filter((k) => k.startsWith(KEY_PREFIX)));
+    await AsyncStorage.multiRemove(
+      keys.filter((k) => k.startsWith(KEY_PREFIX) || k.startsWith(PLANNING_NUDGE_PREFIX) || k.startsWith(POSTTRIP_NUDGE_PREFIX))
+    );
+  } catch (e) {}
+}
+
+async function hasNotificationPermission() {
+  const current = await Notifications.getPermissionsAsync();
+  return current.granted || current.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+}
+
+// Fires once, a few days after a trip is created with no start date yet,
+// nudging the user back to finish planning it. Never prompts for
+// permission itself — only schedules if it's already granted, since this
+// runs automatically rather than from an explicit user action. Cancelled
+// the moment a start date gets set (see cancelAbandonedPlanningNudge).
+export async function scheduleAbandonedPlanningNudge(trip: any) {
+  await cancelAbandonedPlanningNudge(trip.id);
+  if (trip.start_date) return;
+  if (!(await hasNotificationPermission())) return;
+  initNotifications();
+  const fireAt = new Date(Date.now() + PLANNING_NUDGE_DELAY_MS);
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Still planning?",
+        body: `Your trip to ${trip.destination_name} is waiting to be finished — add dates to start building the itinerary.`,
+        data: { tripId: trip.id },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt, channelId: CHANNEL_ID },
+    });
+    await AsyncStorage.setItem(PLANNING_NUDGE_PREFIX + trip.id, id);
+  } catch (e) {}
+}
+
+export async function cancelAbandonedPlanningNudge(tripId: string) {
+  try {
+    const id = await AsyncStorage.getItem(PLANNING_NUDGE_PREFIX + tripId);
+    if (id) {
+      await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+      await AsyncStorage.removeItem(PLANNING_NUDGE_PREFIX + tripId);
+    }
+  } catch (e) {}
+}
+
+// Fires the day after a trip ends, nudging the user back into the app to
+// plan the next one. Rescheduled whenever end_date changes; same
+// permission rule as the planning nudge above.
+export async function schedulePostTripNudge(trip: any) {
+  await cancelPostTripNudge(trip.id);
+  if (!trip.end_date) return;
+  if (!(await hasNotificationPermission())) return;
+  initNotifications();
+  const fireAt = new Date(trip.end_date + "T00:00:00");
+  fireAt.setDate(fireAt.getDate() + 1);
+  fireAt.setHours(11, 0, 0, 0);
+  if (fireAt.getTime() <= Date.now()) return;
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `Welcome back from ${trip.destination_name}!`,
+        body: "Ready to plan your next adventure?",
+        data: {},
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt, channelId: CHANNEL_ID },
+    });
+    await AsyncStorage.setItem(POSTTRIP_NUDGE_PREFIX + trip.id, id);
+  } catch (e) {}
+}
+
+export async function cancelPostTripNudge(tripId: string) {
+  try {
+    const id = await AsyncStorage.getItem(POSTTRIP_NUDGE_PREFIX + tripId);
+    if (id) {
+      await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+      await AsyncStorage.removeItem(POSTTRIP_NUDGE_PREFIX + tripId);
+    }
   } catch (e) {}
 }

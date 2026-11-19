@@ -6,8 +6,11 @@ import { colors, radius, spacing } from "../theme";
 import { createTrip, updateTrip } from "../lib/supabase";
 import { buildDatedStops } from "../lib/stops";
 import { enumerateDates } from "../lib/dates";
+import { scheduleAbandonedPlanningNudge, schedulePostTripNudge } from "../lib/reminders";
+import { haptics } from "../lib/haptics";
 import PlaceBanner from "../components/PlaceBanner";
 import DateField from "../components/DateField";
+import PressScale from "../components/PressScale";
 
 export default function TemplatePreviewScreen({ route, navigation }: any) {
   const { template } = route.params;
@@ -43,9 +46,13 @@ export default function TemplatePreviewScreen({ route, navigation }: any) {
         stops: dated,
       });
       await updateTrip(trip.id, { itinerary });
+      scheduleAbandonedPlanningNudge(trip);
+      schedulePostTripNudge(trip);
+      haptics.success();
       navigation.replace("MainTabs", { screen: "Trips" });
     } catch (err: any) {
       setError(err.message || "Could not create trip");
+      haptics.error();
     } finally {
       setBusy(false);
     }
@@ -95,10 +102,10 @@ export default function TemplatePreviewScreen({ route, navigation }: any) {
           <View style={{ flex: 1 }}>
             <DateField value={startDate} onChange={setStartDate} />
           </View>
-          <TouchableOpacity style={[styles.useButton, (busy || !startDate) && { opacity: 0.5 }]} onPress={useTemplate} disabled={busy || !startDate}>
+          <PressScale style={[styles.useButton, (busy || !startDate) && { opacity: 0.5 }]} onPress={useTemplate} disabled={busy || !startDate}>
             <Sparkles size={14} color="#fff" />
             <Text style={styles.useButtonText}>{busy ? "Creating…" : "Use this"}</Text>
-          </TouchableOpacity>
+          </PressScale>
         </View>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>

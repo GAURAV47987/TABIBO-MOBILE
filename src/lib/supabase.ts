@@ -2,7 +2,7 @@ import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "expo-crypto";
-import { cancelAllTripReminders, cancelTripReminders } from "./reminders";
+import { cancelAllTripReminders, cancelTripReminders, cancelAbandonedPlanningNudge, cancelPostTripNudge } from "./reminders";
 
 // Same Supabase project as the web app (src/supabase.js in the TABIGO
 // repo) — one shared backend behind both the PWA and this native app.
@@ -286,6 +286,8 @@ export async function deleteTrip(id: string) {
   if (error) throw error;
   AsyncStorage.removeItem(TRIP_CACHE_PREFIX + id).catch(() => {});
   await cancelTripReminders(id);
+  await cancelAbandonedPlanningNudge(id);
+  await cancelPostTripNudge(id);
 }
 
 // ---- Trip documents -------------------------------------------------------
