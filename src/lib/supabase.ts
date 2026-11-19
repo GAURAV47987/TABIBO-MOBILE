@@ -33,6 +33,17 @@ export async function signOut() {
   if (error) throw error;
 }
 
+// The actual reset happens on the web app (completing it natively here
+// would need deep-link config that's fragile to test before a real EAS
+// build exists) — this just emails a link that opens the web app, where
+// the user sets a new password, then comes back and signs in here as usual.
+export async function resetPasswordForEmail(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: "https://gaurav47987.github.io/TABIGO/",
+  });
+  if (error) throw error;
+}
+
 export async function getSession() {
   const {
     data: { session },
