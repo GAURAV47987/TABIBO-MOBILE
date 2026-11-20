@@ -49,21 +49,24 @@ function openTripFromNotification(response: Notifications.NotificationResponse |
 }
 
 // The "+" isn't one of the flex tabs — it's a sibling overlay, centered on
-// the screen. Only Trips/Explore are tabs here — with two evenly-flexed
-// tabs, their shared boundary is screen-center, exactly where the FAB
-// sits, and the gap stays clear. Home is NOT a Tab.Screen (even a
-// tabBarButton:null one still reserves its flex slot, which pushed Trips
-// off-center and under the FAB) — it lives one level up, as its own
-// RootStack screen, and is reachable by tapping the TABIGO logo (see
-// AppHeader) — matching the web app's own nav (Trips/+/Explore in the
-// bar, Home via the logo).
+// the screen. Home has to stay a Tab.Screen (not pulled out to RootStack)
+// so the bar — and this FAB — are still visible while on Home, matching
+// Trips/Explore. But it must NOT get its own visible column, or 3 tabs
+// means Trips lands dead-center under the FAB instead of the gap between
+// Trips/Explore. tabBarButton:()=>null alone isn't enough — the item's
+// flex slot is still reserved even with no button rendered in it.
+// tabBarItemStyle:{display:"none"} is what actually collapses that slot
+// out of the row's layout, leaving Trips/Explore as the only two columns
+// and their shared boundary — screen-center — clear for the FAB. Home
+// is reachable by tapping the TABIGO logo (see AppHeader), matching the
+// web app's own nav (Trips/+/Explore in the bar, Home via the logo).
 function MainTabs() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
-        initialRouteName="Trips"
+        initialRouteName="Home"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: colors.stamp,
@@ -72,6 +75,11 @@ function MainTabs() {
         }}
         screenListeners={{ tabPress: () => haptics.select() }}
       >
+        <Tab.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{ tabBarButton: () => null, tabBarItemStyle: { display: "none" } }}
+        />
         <Tab.Screen
           name="Trips"
           component={TripsScreen}
@@ -145,8 +153,7 @@ function App() {
           onReady={() => Notifications.getLastNotificationResponseAsync().then(openTripFromNotification).catch(() => {})}
         >
           {session ? (
-            <RootStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Home">
-              <RootStack.Screen name="Home" component={HomeScreen} />
+            <RootStack.Navigator screenOptions={{ headerShown: false }}>
               <RootStack.Screen name="MainTabs" component={MainTabs} />
               <RootStack.Screen name="TripHub" component={TripHubScreen} />
               <RootStack.Screen name="NewTrip" component={NewTripScreen} options={{ presentation: "modal" }} />
