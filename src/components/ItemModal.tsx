@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
 import { colors, radius, spacing } from "../theme";
 import { geocodeDestination } from "../lib/geocode";
@@ -25,6 +25,7 @@ export default function ItemModal({
   const [location, setLocation] = useState(initial?.location || "");
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeError, setGeocodeError] = useState("");
+  const titleRef = useRef<any>(null);
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -57,7 +58,13 @@ export default function ItemModal({
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      onShow={() => !readOnly && titleRef.current?.focus()}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.overlay}
@@ -75,12 +82,12 @@ export default function ItemModal({
             <Text style={[styles.readOnlyValue, { marginBottom: spacing(3) }]}>{title}</Text>
           ) : (
             <TextInput
+              ref={titleRef}
               style={styles.input}
               value={title}
               onChangeText={setTitle}
               placeholder="e.g. Uluwatu temple sunset"
               placeholderTextColor={colors.textFaint}
-              autoFocus
             />
           )}
 
