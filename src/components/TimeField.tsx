@@ -32,7 +32,7 @@ export default function TimeField({ value, onChange, placeholder = "Select a tim
       <TouchableOpacity style={styles.field} onPress={() => setShow(true)}>
         <Text style={value ? styles.valueText : styles.placeholderText}>{value || placeholder}</Text>
       </TouchableOpacity>
-      {show && <DateTimePicker value={timeValue} mode="time" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={handleChange} />}
+      {show && <DateTimePicker value={timeValue} mode="time" display={Platform.OS === "ios" ? "inline" : "default"} onChange={handleChange} />}
       {Platform.OS === "ios" && show && (
         <TouchableOpacity style={styles.doneButton} onPress={() => setShow(false)}>
           <Text style={styles.doneText}>Done</Text>
