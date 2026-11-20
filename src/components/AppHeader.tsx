@@ -13,7 +13,9 @@ export default function AppHeader() {
   const navigation = useNavigation<any>();
   return (
     <SafeAreaView edges={["top"]} style={styles.row}>
-      <Text style={styles.logo}>TABIGO</Text>
+      <TouchableOpacity onPress={() => navigation.navigate("Home")} accessibilityLabel="Go to home">
+        <Text style={styles.logo}>TABIGO</Text>
+      </TouchableOpacity>
       <TouchableOpacity
         onPress={() => navigation.getParent()?.navigate("Profile")}
         style={styles.profileButton}

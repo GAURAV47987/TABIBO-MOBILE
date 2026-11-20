@@ -7,7 +7,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Home, Luggage, Compass, Plus } from "lucide-react-native";
+import { Luggage, Compass, Plus } from "lucide-react-native";
 import type { Session } from "@supabase/supabase-js";
 import { getSession, onAuthStateChange } from "./src/lib/supabase";
 import { colors } from "./src/theme";
@@ -48,16 +48,21 @@ function openTripFromNotification(response: Notifications.NotificationResponse |
   }
 }
 
-// The "+" isn't one of the flex tabs — with Home/Trips/Explore as real
-// tabs, a 4th tab for it would sit at the 3rd-of-4 slot (62.5% across),
-// not screen center. It's rendered as a sibling overlay instead, always
-// centered regardless of how many tabs are either side of it.
+// The "+" isn't one of the flex tabs — it's a sibling overlay, centered on
+// the screen. With only Trips/Explore as visible tabs, screen-center falls
+// in the gap between them, which is also why Home isn't a third visible
+// tab here: a 3-way-even bar puts a tab dead center too, exactly where the
+// FAB sits, and they'd collide. Home stays reachable as a registered
+// (but tab-bar-hidden) route — the default on sign-in, and reachable by
+// tapping the TABIGO logo — matching the web app's own nav (Trips/+/
+// Explore in the bar, Home via the logo).
 function MainTabs() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
+        initialRouteName="Home"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: colors.stamp,
@@ -69,7 +74,7 @@ function MainTabs() {
         <Tab.Screen
           name="Home"
           component={HomeScreen}
-          options={{ tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
+          options={{ tabBarButton: () => null }}
         />
         <Tab.Screen
           name="Trips"
