@@ -9,7 +9,6 @@ import { buildDatedStops } from "../lib/stops";
 import { getTripClimate } from "../lib/weather";
 import { CURRENCIES } from "../lib/constants";
 import DateField from "../components/DateField";
-import PlaceBanner from "../components/PlaceBanner";
 import PressScale from "../components/PressScale";
 import { haptics } from "../lib/haptics";
 import { scheduleAbandonedPlanningNudge, schedulePostTripNudge } from "../lib/reminders";
@@ -247,12 +246,6 @@ export default function NewTripScreen({ navigation }: any) {
       : null;
 
   const daysPlanned = stops.reduce((sum, s) => sum + s.days, 0);
-  const daysPlannedNote =
-    daysPlanned === totalDays
-      ? `${daysPlanned} of ${totalDays} days planned — nice, that's all of it.`
-      : daysPlanned < totalDays
-      ? `${daysPlanned} of ${totalDays} days planned — ${totalDays - daysPlanned} day${totalDays - daysPlanned === 1 ? "" : "s"} left to assign.`
-      : `${daysPlanned} of ${totalDays} days planned — ${daysPlanned - totalDays} day${daysPlanned - totalDays === 1 ? "" : "s"} over; that's fine, your trip will just run a bit longer.`;
 
   // Moving from step 1 to Route: only the single default stop exists so
   // far (nothing split out yet), so hand it the full day count the user
@@ -351,16 +344,75 @@ export default function NewTripScreen({ navigation }: any) {
 
         {step === 2 && (
           <View>
-            <Text style={styles.title}>Your route</Text>
-            <View style={{ marginBottom: spacing(4), borderRadius: radius.lg, overflow: "hidden" }}>
-              <PlaceBanner placeName={stops[0]?.name} height={150} />
-            </View>
-            <Text style={styles.hintText}>{daysPlannedNote}</Text>
+            <Text style={styles.title}>Which cities will you visit?</Text>
+            <Text style={styles.subtitle}>
+              {stops.length > 1
+                ? `Nice — here's how your ${totalDays} day${totalDays === 1 ? "" : "s"} break down.`
+                : `Split your ${totalDays} day${totalDays === 1 ? "" : "s"} across every stop — add as many cities as you like.`}
+            </Text>
 
-            <JourneyStrip stops={stops} onChangeDays={changeDays} onRemove={removeStop} />
+            {stops.length === 1 && (
+              <View style={styles.calloutBox}>
+                <View style={styles.calloutIcon}>
+                  <Plus size={16} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.calloutTitle}>Start by adding a city</Text>
+                  <Text style={styles.calloutText}>e.g. Sydney, Melbourne, Perth — tap the button below to search.</Text>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.progressCard}>
+              <View style={styles.progressCardRow}>
+                <Text style={styles.progressCardLabel}>Days planned</Text>
+                <Text style={[styles.progressCardValue, daysPlanned > totalDays && { color: colors.stamp }]}>
+                  {daysPlanned} of {totalDays}
+                  {daysPlanned === totalDays ? " — all set" : ""}
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.min(100, (daysPlanned / totalDays) * 100)}%` },
+                    daysPlanned > totalDays && { backgroundColor: colors.stamp },
+                  ]}
+                />
+              </View>
+            </View>
+
+            <View style={{ gap: spacing(2.5) }}>
+              {stops.map((s, i) => (
+                <View key={`${s.name}-${i}`} style={styles.stopCard}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5), flexShrink: 1 }}>
+                    <View style={styles.stopCardDot} />
+                    <View style={{ flexShrink: 1 }}>
+                      <Text style={styles.stopCardName}>{s.name}</Text>
+                      {stops.length > 1 ? (
+                        <TouchableOpacity onPress={() => removeStop(i)}>
+                          <Text style={styles.stopCardRemove}>Remove</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <Text style={styles.stopCardHint}>Whole country — add cities to break this down</Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.stopCardStepper}>
+                    <TouchableOpacity style={styles.stepperButton} onPress={() => changeDays(i, -1)}>
+                      <Text style={styles.stepperText}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.stopCardDays}>{s.days}d</Text>
+                    <TouchableOpacity style={styles.stepperButton} onPress={() => changeDays(i, 1)}>
+                      <Text style={styles.stepperText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
 
             {addingStop ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2), marginTop: spacing(2) }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2), marginTop: spacing(3) }}>
                 <View style={{ flex: 1 }}>
                   <PlaceAutocomplete autoFocus placeholder="e.g. Paris" value={newStopName} onChangeText={setNewStopName} onPick={addStop} />
                 </View>
@@ -368,10 +420,15 @@ export default function NewTripScreen({ navigation }: any) {
                   <X size={18} color={colors.textTertiary} />
                 </TouchableOpacity>
               </View>
+            ) : stops.length === 1 ? (
+              <TouchableOpacity style={styles.addCityButtonBold} onPress={() => setAddingStop(true)}>
+                <Plus size={18} color={colors.primaryBg} />
+                <Text style={styles.addCityButtonBoldText}>Add a city</Text>
+              </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={styles.addStopLink} onPress={() => setAddingStop(true)}>
-                <Plus size={14} color={colors.textSecondary} />
-                <Text style={styles.addStopText}>Add another stop</Text>
+              <TouchableOpacity style={styles.addCityButtonLight} onPress={() => setAddingStop(true)}>
+                <Plus size={16} color={colors.textTertiary} />
+                <Text style={styles.addCityButtonLightText}>Add another city</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -536,6 +593,77 @@ const styles = StyleSheet.create({
   addStopText: { fontSize: 14, color: colors.textSecondary },
   totalDaysRow: { flexDirection: "row", alignItems: "center", gap: spacing(3) },
   totalDaysLabel: { fontSize: 16, fontWeight: "600", color: colors.textPrimary, minWidth: 64 },
+  calloutBox: {
+    flexDirection: "row",
+    gap: spacing(3),
+    alignItems: "flex-start",
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: colors.stamp,
+    backgroundColor: "#FFF4F7",
+    borderRadius: radius.lg,
+    padding: spacing(4),
+    marginBottom: spacing(4),
+  },
+  calloutIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.stamp, alignItems: "center", justifyContent: "center" },
+  calloutTitle: { fontSize: 14, fontWeight: "700", color: colors.textPrimary, marginBottom: 2 },
+  calloutText: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  progressCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(3.5),
+    marginBottom: spacing(4),
+  },
+  progressCardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginBottom: spacing(2) },
+  progressCardLabel: { fontSize: 13, fontWeight: "600", color: colors.textPrimary },
+  progressCardValue: { fontSize: 13, color: colors.textMuted },
+  progressTrack: { height: 8, borderRadius: 999, backgroundColor: colors.border, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 999, backgroundColor: colors.primaryBg },
+  stopCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(3.5),
+  },
+  stopCardDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.stamp },
+  stopCardName: { fontSize: 15, fontWeight: "600", color: colors.textPrimary },
+  stopCardRemove: { fontSize: 12, color: colors.stamp, textDecorationLine: "underline", marginTop: 2 },
+  stopCardHint: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  stopCardStepper: { flexDirection: "row", alignItems: "center", gap: spacing(2) },
+  stopCardDays: { fontSize: 13, color: colors.textTertiary, minWidth: 18, textAlign: "center" },
+  addCityButtonBold: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing(2),
+    borderWidth: 2,
+    borderColor: colors.primaryBg,
+    backgroundColor: "#F3F0FF",
+    borderRadius: radius.lg,
+    paddingVertical: spacing(3.5),
+    marginTop: spacing(3),
+  },
+  addCityButtonBoldText: { fontSize: 15, fontWeight: "700", color: colors.primaryBg },
+  addCityButtonLight: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing(2),
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: colors.textFaint,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingVertical: spacing(3.5),
+    marginTop: spacing(3),
+  },
+  addCityButtonLightText: { fontSize: 14, fontWeight: "600", color: colors.textTertiary },
   currencyChip: {
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.5),
