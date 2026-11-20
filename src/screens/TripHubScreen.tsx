@@ -74,8 +74,19 @@ export default function TripHubScreen() {
       if ("itinerary" in fields || "start_date" in fields) syncTripReminders(next);
     } catch (err: any) {
       setTrip(before);
-      setOffline(true);
-      Alert.alert("Not saved", "You appear to be offline. Your trip is viewable, but changes need a connection.");
+      // A real network failure (no signal, request couldn't even reach the
+      // server) throws a plain Error with no Postgrest error code. Anything
+      // with a code — an RLS rejection, a bad column, etc. — is a real bug,
+      // not a connectivity issue, so it gets its own message instead of
+      // being misreported as "offline" and hidden.
+      const isNetworkError = !err?.code;
+      setOffline(isNetworkError);
+      Alert.alert(
+        "Not saved",
+        isNetworkError
+          ? "You appear to be offline. Your trip is viewable, but changes need a connection."
+          : `Couldn't save this change: ${err?.message || "please try again."}`
+      );
       throw err;
     }
   };

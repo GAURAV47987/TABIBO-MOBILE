@@ -94,7 +94,7 @@ function MainTabs() {
       </Tab.Navigator>
       <PressScale
         style={[styles.fab, { bottom: insets.bottom + 20 }]}
-        onPress={() => navigation.getParent()?.navigate("NewTrip")}
+        onPress={() => navigation.navigate("NewTrip")}
         accessibilityLabel="Create new trip"
       >
         <Plus color="#fff" size={26} strokeWidth={2.5} />
