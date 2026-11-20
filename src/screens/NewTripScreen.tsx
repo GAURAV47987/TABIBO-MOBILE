@@ -14,7 +14,7 @@ import PressScale from "../components/PressScale";
 import { haptics } from "../lib/haptics";
 import { scheduleAbandonedPlanningNudge, schedulePostTripNudge } from "../lib/reminders";
 
-const STEPS = ["Destination", "Dates", "Route", "Add-ons"];
+const STEPS = ["Destination", "Route", "Add-ons"];
 
 type Stop = { name: string; lat: number; lng: number; days: number };
 
@@ -141,10 +141,12 @@ export default function NewTripScreen({ navigation }: any) {
   };
   const removeStop = (i: number) => setStops((prev) => prev.filter((_, idx) => idx !== i));
 
+  // Picking a place no longer advances the step — destination, dates and
+  // currency all live on step 1 together now, so this just reveals the
+  // rest of that page's fields in place.
   const pickFirstPlace = (place: { name: string; lat: number; lng: number }) => {
     setError("");
     setStops([{ name: place.name, lat: place.lat, lng: place.lng, days: 3 }]);
-    setStep(2);
   };
 
   const continueStep1 = async () => {
@@ -154,7 +156,6 @@ export default function NewTripScreen({ navigation }: any) {
     try {
       const place = await geocodeDestination(pendingName.trim());
       setStops([{ name: pendingName.trim(), lat: place.lat, lng: place.lng, days: 3 }]);
-      setStep(2);
     } catch (err: any) {
       setError(err.message || "Could not find that place");
     } finally {
@@ -169,7 +170,7 @@ export default function NewTripScreen({ navigation }: any) {
   };
 
   useEffect(() => {
-    if (step !== 2 || !startDate || !stops[0]) {
+    if (step !== 1 || !startDate || !stops[0]) {
       setClimate(null);
       return;
     }
@@ -185,7 +186,7 @@ export default function NewTripScreen({ navigation }: any) {
   }, [step, startDate]);
 
   useEffect(() => {
-    if (step !== 4 || suggestions !== null || !stops[0]) return;
+    if (step !== 3 || suggestions !== null || !stops[0]) return;
     setSuggestLoading(true);
     setSuggestError("");
     suggestPopularPlaces(stops[0].name)
@@ -253,14 +254,14 @@ export default function NewTripScreen({ navigation }: any) {
       ? `${daysPlanned} of ${totalDays} days planned — ${totalDays - daysPlanned} day${totalDays - daysPlanned === 1 ? "" : "s"} left to assign.`
       : `${daysPlanned} of ${totalDays} days planned — ${daysPlanned - totalDays} day${daysPlanned - totalDays === 1 ? "" : "s"} over; that's fine, your trip will just run a bit longer.`;
 
-  // Moving from Dates to Route: only the single default stop exists so
+  // Moving from step 1 to Route: only the single default stop exists so
   // far (nothing split out yet), so hand it the full day count the user
   // just chose — it's then theirs to redistribute as they add stops.
   // Once they've already split days across more than one stop, this step
   // leaves that allocation alone rather than clobbering it on Back/Next.
   const continueToRoute = () => {
     if (stops.length === 1) setStops([{ ...stops[0], days: totalDays }]);
-    setStep(3);
+    setStep(2);
   };
 
   return (
@@ -285,60 +286,70 @@ export default function NewTripScreen({ navigation }: any) {
           <View>
             <Text style={styles.title}>Where are you going?</Text>
             <Text style={styles.subtitle}>Type a city, or a whole country to see its biggest cities.</Text>
-            <PlaceAutocomplete autoFocus placeholder="e.g. Bali, or Japan" value={pendingName} onChangeText={setPendingName} onPick={pickFirstPlace} />
+
+            {stops[0] ? (
+              <View style={styles.pickedPlaceRow}>
+                <Text style={styles.pickedPlaceText}>
+                  Going to <Text style={{ fontWeight: "700" }}>{stops[0].name}</Text>
+                </Text>
+                <TouchableOpacity onPress={() => setStops([])}>
+                  <Text style={styles.changeLink}>Change</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <PlaceAutocomplete autoFocus placeholder="e.g. Bali, or Japan" value={pendingName} onChangeText={setPendingName} onPick={pickFirstPlace} />
+            )}
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            {stops[0] && (
+              <View style={{ marginTop: spacing(4) }}>
+                <Text style={styles.label}>Trip name (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder={stops.map((s) => s.name).join(" → ")}
+                  placeholderTextColor={colors.textFaint}
+                  value={tripName}
+                  onChangeText={setTripName}
+                />
+
+                <Text style={[styles.label, { marginTop: spacing(3) }]}>Start date (optional)</Text>
+                <DateField value={startDate} onChange={setStartDate} placeholder="Not sure yet? Skip this" />
+                {climateNote ? (
+                  <Text style={styles.hintText}>☀ {climateNote}</Text>
+                ) : (
+                  <Text style={styles.hintText}>Not sure yet? Skip this — you can add dates later from the trip's Itinerary tab.</Text>
+                )}
+
+                <Text style={[styles.label, { marginTop: spacing(3) }]}>How many days is this trip?</Text>
+                <View style={styles.totalDaysRow}>
+                  <TouchableOpacity style={styles.stepperButton} onPress={() => setTotalDays((d) => Math.max(1, d - 1))}>
+                    <Text style={styles.stepperText}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.totalDaysLabel}>{totalDays} day{totalDays === 1 ? "" : "s"}</Text>
+                  <TouchableOpacity style={styles.stepperButton} onPress={() => setTotalDays((d) => d + 1)}>
+                    <Text style={styles.stepperText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.hintText}>Next, you'll split these days across every place you're visiting.</Text>
+
+                <Text style={[styles.label, { marginTop: spacing(3) }]}>Home currency (for budget totals)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {CURRENCIES.map((c: string) => (
+                    <TouchableOpacity
+                      key={c}
+                      onPress={() => setHomeCurrency(c)}
+                      style={[styles.currencyChip, homeCurrency === c && styles.currencyChipActive]}
+                    >
+                      <Text style={[styles.currencyChipText, homeCurrency === c && styles.currencyChipTextActive]}>{c}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </View>
         )}
 
         {step === 2 && (
-          <View>
-            <Text style={styles.title}>When are you going?</Text>
-
-            <Text style={styles.label}>Trip name (optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={stops.map((s) => s.name).join(" → ")}
-              placeholderTextColor={colors.textFaint}
-              value={tripName}
-              onChangeText={setTripName}
-            />
-
-            <Text style={[styles.label, { marginTop: spacing(3) }]}>Start date (optional)</Text>
-            <DateField value={startDate} onChange={setStartDate} placeholder="Not sure yet? Skip this" />
-            {climateNote ? (
-              <Text style={styles.hintText}>☀ {climateNote}</Text>
-            ) : (
-              <Text style={styles.hintText}>Not sure yet? Skip this — you can add dates later from the trip's Itinerary tab.</Text>
-            )}
-
-            <Text style={[styles.label, { marginTop: spacing(3) }]}>How many days is this trip?</Text>
-            <View style={styles.totalDaysRow}>
-              <TouchableOpacity style={styles.stepperButton} onPress={() => setTotalDays((d) => Math.max(1, d - 1))}>
-                <Text style={styles.stepperText}>−</Text>
-              </TouchableOpacity>
-              <Text style={styles.totalDaysLabel}>{totalDays} day{totalDays === 1 ? "" : "s"}</Text>
-              <TouchableOpacity style={styles.stepperButton} onPress={() => setTotalDays((d) => d + 1)}>
-                <Text style={styles.stepperText}>+</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.hintText}>Next, you'll split these days across every place you're visiting.</Text>
-
-            <Text style={[styles.label, { marginTop: spacing(3) }]}>Home currency (for budget totals)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {CURRENCIES.map((c: string) => (
-                <TouchableOpacity
-                  key={c}
-                  onPress={() => setHomeCurrency(c)}
-                  style={[styles.currencyChip, homeCurrency === c && styles.currencyChipActive]}
-                >
-                  <Text style={[styles.currencyChipText, homeCurrency === c && styles.currencyChipTextActive]}>{c}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {step === 3 && (
           <View>
             <Text style={styles.title}>Your route</Text>
             <View style={{ marginBottom: spacing(4), borderRadius: radius.lg, overflow: "hidden" }}>
@@ -366,7 +377,7 @@ export default function NewTripScreen({ navigation }: any) {
           </View>
         )}
 
-        {step === 4 && (
+        {step === 3 && (
           <View>
             <Text style={styles.title}>Popular add-ons</Text>
             <Text style={styles.subtitle}>Tap a stamp to add it to your route — collect as many as you like.</Text>
@@ -417,7 +428,7 @@ export default function NewTripScreen({ navigation }: any) {
             <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
         )}
-        {step === 1 && (
+        {step === 1 && !stops[0] && (
           <TouchableOpacity
             style={[styles.nextButton, (busy || !pendingName.trim()) && { opacity: 0.6 }]}
             onPress={continueStep1}
@@ -426,17 +437,17 @@ export default function NewTripScreen({ navigation }: any) {
             {busy ? <ActivityIndicator color={colors.primaryText} /> : <Text style={styles.nextButtonText}>Continue</Text>}
           </TouchableOpacity>
         )}
-        {step === 2 && (
+        {step === 1 && stops[0] && (
           <TouchableOpacity style={styles.nextButton} onPress={continueToRoute}>
             <Text style={styles.nextButtonText}>Next</Text>
           </TouchableOpacity>
         )}
-        {step === 3 && (
-          <TouchableOpacity style={[styles.nextButton, stops.length === 0 && { opacity: 0.6 }]} onPress={() => setStep(4)} disabled={stops.length === 0}>
+        {step === 2 && (
+          <TouchableOpacity style={[styles.nextButton, stops.length === 0 && { opacity: 0.6 }]} onPress={() => setStep(3)} disabled={stops.length === 0}>
             <Text style={styles.nextButtonText}>Next</Text>
           </TouchableOpacity>
         )}
-        {step === 4 && (
+        {step === 3 && (
           <PressScale style={[styles.createButton, busy && { opacity: 0.6 }]} onPress={finalize} disabled={busy}>
             {busy ? (
               <ActivityIndicator color="#fff" />
@@ -491,6 +502,19 @@ const styles = StyleSheet.create({
   suggestionRow: { paddingHorizontal: spacing(3), paddingVertical: spacing(2.5) },
   suggestionBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   suggestionText: { color: colors.textBody, fontSize: 14 },
+  pickedPlaceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+  },
+  pickedPlaceText: { fontSize: 15, color: colors.textBody },
+  changeLink: { fontSize: 13, color: colors.stamp, textDecorationLine: "underline" },
   stopWrap: { alignItems: "center", width: 92, marginRight: spacing(3) },
   stopDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.stamp, marginBottom: spacing(1) },
   stopName: { fontSize: 12, fontWeight: "500", color: colors.textPrimary, textAlign: "center" },
