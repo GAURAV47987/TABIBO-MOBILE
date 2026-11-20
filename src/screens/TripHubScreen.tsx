@@ -2,9 +2,9 @@ import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from "react-native";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Calendar, Wallet, ArrowLeftRight, Map as MapIcon, Luggage, FileText, WifiOff } from "lucide-react-native";
+import { Calendar, Wallet, ArrowLeftRight, Map as MapIcon, Luggage, FileText, WifiOff, Users } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
-import { loadTrip, updateTrip, patchCachedTrip } from "../lib/supabase";
+import { loadTrip, updateTrip, patchCachedTrip, getMyTripRole, leaveTrip, type TripRole } from "../lib/supabase";
 import { syncTripReminders, cancelAbandonedPlanningNudge, schedulePostTripNudge } from "../lib/reminders";
 import { haptics } from "../lib/haptics";
 import { getEffectiveStops, buildDatedStops } from "../lib/stops";
@@ -38,6 +38,7 @@ export default function TripHubScreen() {
   const route = useRoute<any>();
   const { tripId } = route.params;
   const [trip, setTrip] = useState<any>(null);
+  const [role, setRole] = useState<TripRole>("owner");
   const [tab, setTab] = useState("itinerary");
   const [offline, setOffline] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -50,11 +51,14 @@ export default function TripHubScreen() {
           setOffline(fromCache);
           setLoadError("");
           syncTripReminders(data);
+          getMyTripRole(data).then(setRole);
         },
         (err) => setLoadError(err.message || "Could not load this trip")
       );
     }, [tripId])
   );
+
+  const canEdit = role === "owner" || role === "editor";
 
   // Optimistic: the UI updates immediately; if the write fails (usually no
   // signal) the change is rolled back and the user is told, rather than it
@@ -127,6 +131,35 @@ export default function TripHubScreen() {
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Text style={styles.backText}>← My trips</Text>
           </TouchableOpacity>
+          {role === "owner" && (
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={() => (navigation as any).navigate("Share", { tripId, destinationName: trip.destination_name })}
+              accessibilityLabel="Share trip"
+            >
+              <Users size={16} color="#fff" />
+            </TouchableOpacity>
+          )}
+          {role !== "owner" && (
+            <TouchableOpacity
+              style={styles.viewerBadge}
+              onPress={() =>
+                Alert.alert("Leave this trip?", "You'll lose access until someone invites you again.", [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Leave",
+                    style: "destructive",
+                    onPress: () =>
+                      leaveTrip(tripId)
+                        .then(() => navigation.goBack())
+                        .catch((err: any) => Alert.alert("Couldn't leave", err.message || "Something went wrong")),
+                  },
+                ])
+              }
+            >
+              <Text style={styles.viewerBadgeText}>{role === "viewer" ? "View only · Leave" : "Editor · Leave"}</Text>
+            </TouchableOpacity>
+          )}
           <View style={styles.bannerText}>
             <Text style={styles.bannerTitle}>{trip.destination_name}</Text>
             <Text style={styles.bannerDate}>{dateRangeLabel(trip.start_date, trip.end_date)}</Text>
@@ -147,12 +180,12 @@ export default function TripHubScreen() {
       )}
 
       <View style={{ flex: 1 }}>
-        {tab === "itinerary" && <ItineraryView trip={trip} onSave={save("itinerary")} onSetDates={setTripDates} />}
-        {tab === "budget" && <BudgetView trip={trip} onSave={save("budget")} />}
+        {tab === "itinerary" && <ItineraryView trip={trip} onSave={save("itinerary")} onSetDates={setTripDates} canEdit={canEdit} />}
+        {tab === "budget" && <BudgetView trip={trip} onSave={save("budget")} canEdit={canEdit} />}
         {tab === "convert" && <ConvertView homeCurrency={trip.home_currency || "USD"} />}
-        {tab === "map" && <TripMapView trip={trip} onSave={save("map_pins")} />}
-        {tab === "pack" && <PackingView trip={trip} onSave={save("packing")} />}
-        {tab === "docs" && <DocumentsView trip={trip} offline={offline} onSave={(docs) => persist({ documents: docs })} />}
+        {tab === "map" && <TripMapView trip={trip} onSave={save("map_pins")} canEdit={canEdit} />}
+        {tab === "pack" && <PackingView trip={trip} onSave={save("packing")} canEdit={canEdit} />}
+        {tab === "docs" && <DocumentsView trip={trip} offline={offline} onSave={(docs) => persist({ documents: docs })} canEdit={canEdit} />}
       </View>
 
       <View style={styles.tabBar}>
@@ -177,6 +210,26 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
   comingSoon: { color: colors.textSecondary },
   backButton: { position: "absolute", top: spacing(3), left: spacing(3), zIndex: 10 },
+  shareButton: {
+    position: "absolute",
+    top: spacing(3),
+    right: spacing(3),
+    zIndex: 10,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 999,
+    padding: spacing(1.5),
+  },
+  viewerBadge: {
+    position: "absolute",
+    top: spacing(3),
+    right: spacing(3),
+    zIndex: 10,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 999,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1.2),
+  },
+  viewerBadgeText: { color: "#fff", fontSize: 11, fontWeight: "600" },
   backText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   bannerText: { position: "absolute", left: 0, right: 0, bottom: 0, padding: spacing(4) },
   bannerTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },

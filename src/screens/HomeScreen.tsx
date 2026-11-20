@@ -3,12 +3,14 @@ import { colors, radius, spacing } from "../theme";
 import { TRIP_TEMPLATES } from "../lib/templates";
 import PlaceBanner from "../components/PlaceBanner";
 import AppHeader from "../components/AppHeader";
+import PendingInvites from "../components/PendingInvites";
 
 export default function HomeScreen({ navigation }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <AppHeader />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
+        <PendingInvites />
         <Text style={styles.greeting}>Your next adventure starts here.</Text>
         <Text style={styles.heading}>Where do you want to go next?</Text>
 

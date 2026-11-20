@@ -10,12 +10,14 @@ export default function ItemModal({
   onSave,
   onDelete,
   onClose,
+  readOnly = false,
 }: {
   date: string;
   initial?: any;
   onSave: (fields: any) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  readOnly?: boolean;
 }) {
   const [time, setTime] = useState(initial?.time || "");
   const [title, setTitle] = useState(initial?.title || "");
@@ -61,55 +63,83 @@ export default function ItemModal({
         style={styles.overlay}
       >
         <View style={styles.card}>
-          <Text style={styles.title}>{initial ? "Edit plan" : "Add to itinerary"}</Text>
+          <Text style={styles.title}>{readOnly ? "Plan details" : initial ? "Edit plan" : "Add to itinerary"}</Text>
 
           <Text style={styles.label}>Time (optional)</Text>
           <View style={{ marginBottom: spacing(3) }}>
-            <TimeField value={time} onChange={setTime} placeholder="Select a time" />
+            {readOnly ? <Text style={styles.readOnlyValue}>{time || "—"}</Text> : <TimeField value={time} onChange={setTime} placeholder="Select a time" />}
           </View>
 
           <Text style={styles.label}>What's happening?</Text>
-          <TextInput
-            style={styles.input}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g. Uluwatu temple sunset"
-            placeholderTextColor={colors.textFaint}
-            autoFocus
-          />
+          {readOnly ? (
+            <Text style={[styles.readOnlyValue, { marginBottom: spacing(3) }]}>{title}</Text>
+          ) : (
+            <TextInput
+              style={styles.input}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="e.g. Uluwatu temple sunset"
+              placeholderTextColor={colors.textFaint}
+              autoFocus
+            />
+          )}
 
-          <Text style={styles.label}>Notes (optional)</Text>
-          <TextInput
-            style={[styles.input, { height: 70, textAlignVertical: "top" }]}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            placeholderTextColor={colors.textFaint}
-          />
+          {(!readOnly || notes) && (
+            <>
+              <Text style={styles.label}>Notes (optional)</Text>
+              {readOnly ? (
+                <Text style={[styles.readOnlyValue, { marginBottom: spacing(3) }]}>{notes}</Text>
+              ) : (
+                <TextInput
+                  style={[styles.input, { height: 70, textAlignVertical: "top" }]}
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                  placeholderTextColor={colors.textFaint}
+                />
+              )}
+            </>
+          )}
 
-          <Text style={styles.label}>Location (optional — drops a pin on the Map)</Text>
-          <TextInput
-            style={styles.input}
-            value={location}
-            onChangeText={setLocation}
-            placeholder="e.g. Uluwatu Temple, Bali"
-            placeholderTextColor={colors.textFaint}
-          />
+          {(!readOnly || location) && (
+            <>
+              <Text style={styles.label}>Location (optional — drops a pin on the Map)</Text>
+              {readOnly ? (
+                <Text style={[styles.readOnlyValue, { marginBottom: spacing(3) }]}>{location}</Text>
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  value={location}
+                  onChangeText={setLocation}
+                  placeholder="e.g. Uluwatu Temple, Bali"
+                  placeholderTextColor={colors.textFaint}
+                />
+              )}
+            </>
+          )}
           {geocodeError ? <Text style={styles.errorText}>{geocodeError}</Text> : null}
 
-          <View style={styles.row}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose} disabled={geocoding}>
-              <Text style={styles.cancelText}>Cancel</Text>
+          {readOnly ? (
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+              <Text style={styles.cancelText}>Close</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={submit} disabled={geocoding}>
-              <Text style={styles.saveText}>{geocoding ? "Finding place…" : "Save"}</Text>
-            </TouchableOpacity>
-          </View>
+          ) : (
+            <>
+              <View style={styles.row}>
+                <TouchableOpacity style={styles.cancelButton} onPress={onClose} disabled={geocoding}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveButton} onPress={submit} disabled={geocoding}>
+                  <Text style={styles.saveText}>{geocoding ? "Finding place…" : "Save"}</Text>
+                </TouchableOpacity>
+              </View>
 
-          {initial && (
-            <TouchableOpacity style={styles.deleteLink} onPress={() => onDelete(initial.id)}>
-              <Text style={styles.deleteText}>Delete</Text>
-            </TouchableOpacity>
+              {initial && (
+                <TouchableOpacity style={styles.deleteLink} onPress={() => onDelete(initial.id)}>
+                  <Text style={styles.deleteText}>Delete</Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </View>
       </KeyboardAvoidingView>
@@ -154,6 +184,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(2.5),
     fontSize: 16,
+    marginBottom: spacing(3),
+  },
+  readOnlyValue: {
+    fontSize: 16,
+    color: colors.textBody,
     marginBottom: spacing(3),
   },
   errorText: {

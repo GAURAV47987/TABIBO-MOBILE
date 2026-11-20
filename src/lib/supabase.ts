@@ -122,6 +122,13 @@ export async function uploadAvatar(uri: string, mimeType: string) {
   return getAvatarUrl(user.id);
 }
 
+export async function getCurrentUserId() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
 export async function getSession() {
   const {
     data: { session },
@@ -241,7 +248,7 @@ export async function patchCachedTrip(id: string, fields: Record<string, any>) {
 export async function listTrips() {
   const { data, error } = await supabase
     .from("trips")
-    .select("id, destination_name, destination_lat, destination_lng, start_date, end_date, stops, photo_url, created_at")
+    .select("id, user_id, destination_name, destination_lat, destination_lng, start_date, end_date, stops, photo_url, created_at")
     .order("start_date", { ascending: true, nullsFirst: false });
   if (error) throw error;
   return data;
@@ -288,6 +295,75 @@ export async function deleteTrip(id: string) {
   await cancelTripReminders(id);
   await cancelAbandonedPlanningNudge(id);
   await cancelPostTripNudge(id);
+}
+
+// ---- Sharing / collaboration -----------------------------------------
+// See supabase/add_trip_collaborators.sql (in the TABIGO web repo) — every
+// write here goes through a security-definer RPC, never a direct table
+// write, so a client can only ever read a collaborator row, not tamper
+// with its own role while accepting an invite.
+
+export type TripRole = "owner" | "editor" | "viewer";
+
+// Whichever of owner/editor/viewer is most permissive for this trip and
+// session — "viewer" if an accepted collaborator row exists but isn't
+// resolved yet, since that's the safe default while loading.
+export async function getMyTripRole(trip: { id: string; user_id: string }): Promise<TripRole> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return "viewer";
+  if (trip.user_id === user.id) return "owner";
+  const { data } = await supabase
+    .from("trip_collaborators")
+    .select("role")
+    .eq("trip_id", trip.id)
+    .eq("user_id", user.id)
+    .eq("status", "accepted")
+    .maybeSingle();
+  return data?.role === "editor" ? "editor" : "viewer";
+}
+
+export async function inviteTripCollaborator(tripId: string, email: string, role: "editor" | "viewer") {
+  const { error } = await supabase.rpc("invite_trip_collaborator", { p_trip_id: tripId, p_email: email, p_role: role });
+  if (error) throw error;
+}
+
+export async function updateCollaboratorRole(collaboratorId: string, role: "editor" | "viewer") {
+  const { error } = await supabase.rpc("update_trip_collaborator_role", { p_collaborator_id: collaboratorId, p_role: role });
+  if (error) throw error;
+}
+
+export async function removeCollaborator(collaboratorId: string) {
+  const { error } = await supabase.rpc("remove_trip_collaborator", { p_collaborator_id: collaboratorId });
+  if (error) throw error;
+}
+
+export async function listTripCollaborators(tripId: string) {
+  const { data, error } = await supabase.rpc("list_trip_collaborators", { p_trip_id: tripId });
+  if (error) throw error;
+  return data as { id: string; role: string; status: string; email: string }[];
+}
+
+export async function listMyPendingInvites() {
+  const { data, error } = await supabase.rpc("list_my_pending_invites");
+  if (error) throw error;
+  return data as { collaborator_id: string; trip_id: string; destination_name: string; role: string; invited_by_email: string }[];
+}
+
+export async function acceptTripInvite(tripId: string) {
+  const { error } = await supabase.rpc("accept_trip_invite", { p_trip_id: tripId });
+  if (error) throw error;
+}
+
+export async function declineTripInvite(tripId: string) {
+  const { error } = await supabase.rpc("decline_trip_invite", { p_trip_id: tripId });
+  if (error) throw error;
+}
+
+export async function leaveTrip(tripId: string) {
+  const { error } = await supabase.rpc("leave_trip", { p_trip_id: tripId });
+  if (error) throw error;
 }
 
 // ---- Trip documents -------------------------------------------------------

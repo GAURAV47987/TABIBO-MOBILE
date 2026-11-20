@@ -65,6 +65,7 @@ function DayCard({
   onAdd,
   onEdit,
   onReorder,
+  canEdit,
 }: {
   date: string;
   dayNumber: number;
@@ -73,6 +74,7 @@ function DayCard({
   onAdd: (date: string) => void;
   onEdit: (item: any) => void;
   onReorder: (orderedIds: string[]) => void;
+  canEdit: boolean;
 }) {
   const sorted = sortDayItems(items);
 
@@ -93,9 +95,11 @@ function DayCard({
           <Text style={styles.dayTitle}>{formatDay(date, dayNumber)}</Text>
           {stopName ? <Text style={styles.dayStop}>{stopName}</Text> : null}
         </View>
-        <TouchableOpacity onPress={() => onAdd(date)}>
-          <Text style={styles.addLink}>+ Add</Text>
-        </TouchableOpacity>
+        {canEdit && (
+          <TouchableOpacity onPress={() => onAdd(date)}>
+            <Text style={styles.addLink}>+ Add</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {sorted.length === 0 ? (
@@ -114,7 +118,7 @@ function DayCard({
                 </View>
                 {item.notes ? <Text style={styles.itemNotes}>{item.notes}</Text> : null}
               </TouchableOpacity>
-              {sorted.length > 1 && (
+              {canEdit && sorted.length > 1 && (
                 <View style={styles.reorderCol}>
                   <TouchableOpacity
                     disabled={index === 0}
@@ -259,7 +263,17 @@ function Toolbar({ trip }: { trip: any }) {
   );
 }
 
-export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any; onSave: (items: any[]) => void; onSetDates: (startDate: string) => Promise<void> }) {
+export default function ItineraryView({
+  trip,
+  onSave,
+  onSetDates,
+  canEdit = true,
+}: {
+  trip: any;
+  onSave: (items: any[]) => void;
+  onSetDates: (startDate: string) => Promise<void>;
+  canEdit?: boolean;
+}) {
   const [modalDate, setModalDate] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<any>(null);
 
@@ -310,7 +324,7 @@ export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any;
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
       <Toolbar trip={trip} />
-      <AIGenerateCard trip={trip} onGenerated={(newItems) => onSave([...items, ...newItems])} />
+      {canEdit && <AIGenerateCard trip={trip} onGenerated={(newItems) => onSave([...items, ...newItems])} />}
 
       {days.map((date, i) => (
         <DayCard
@@ -325,11 +339,12 @@ export default function ItineraryView({ trip, onSave, onSetDates }: { trip: any;
             setEditingItem(item);
           }}
           onReorder={(orderedIds) => handleReorder(date, orderedIds)}
+          canEdit={canEdit}
         />
       ))}
 
       {modalDate && (
-        <ItemModal date={modalDate} initial={editingItem} onSave={handleSave} onDelete={handleDelete} onClose={closeModal} />
+        <ItemModal date={modalDate} initial={editingItem} onSave={handleSave} onDelete={handleDelete} onClose={closeModal} readOnly={!canEdit} />
       )}
     </ScrollView>
   );

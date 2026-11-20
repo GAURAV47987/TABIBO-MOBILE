@@ -7,7 +7,7 @@ import { getTripClimate } from "../lib/weather";
 import { haptics } from "../lib/haptics";
 import ProgressRing from "./ProgressRing";
 
-export default function PackingView({ trip, onSave }: { trip: any; onSave: (packing: Record<string, boolean>) => void }) {
+export default function PackingView({ trip, onSave, canEdit = true }: { trip: any; onSave: (packing: Record<string, boolean>) => void; canEdit?: boolean }) {
   const checklist = trip.packing || {};
   const [climate, setClimate] = useState<any>(undefined); // undefined = loading, null = unavailable
 
@@ -42,6 +42,7 @@ export default function PackingView({ trip, onSave }: { trip: any; onSave: (pack
   const pct = totalItems > 0 ? (checkedCount / totalItems) * 100 : 0;
 
   const toggle = (key: string) => {
+    if (!canEdit) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     haptics.select();
     onSave({ ...checklist, [key]: !checklist[key] });

@@ -20,6 +20,7 @@ import NewTripScreen from "./src/screens/NewTripScreen";
 import TemplatePreviewScreen from "./src/screens/TemplatePreviewScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import AdminScreen from "./src/screens/AdminScreen";
+import ShareScreen from "./src/screens/ShareScreen";
 import LegalScreen from "./src/screens/LegalScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
 import { loadFromStorage, saveToStorage } from "./src/lib/storage";
@@ -152,6 +153,7 @@ function App() {
                 {({ navigation }) => <ProfileScreen session={session} navigation={navigation} />}
               </RootStack.Screen>
               <RootStack.Screen name="Admin" component={AdminScreen} options={{ presentation: "modal" }} />
+              <RootStack.Screen name="Share" component={ShareScreen} options={{ presentation: "modal" }} />
               <RootStack.Screen name="Legal" component={LegalScreen} options={{ presentation: "modal" }} />
             </RootStack.Navigator>
           ) : (

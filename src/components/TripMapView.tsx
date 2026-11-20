@@ -30,7 +30,7 @@ function shortDay(date: string) {
   return new Date(date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export default function TripMapView({ trip, onSave }: { trip: any; onSave: (pins: any[]) => void }) {
+export default function TripMapView({ trip, onSave, canEdit = true }: { trip: any; onSave: (pins: any[]) => void; canEdit?: boolean }) {
   const pins = trip.map_pins || [];
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
@@ -203,19 +203,23 @@ export default function TripMapView({ trip, onSave }: { trip: any; onSave: (pins
         </View>
       )}
 
-      <TouchableOpacity style={styles.addButton} onPress={() => setShowAdd(true)}>
-        <Plus size={16} color={colors.textPrimary} />
-        <Text style={styles.addButtonText}>Add a place to the map</Text>
-      </TouchableOpacity>
+      {canEdit && (
+        <TouchableOpacity style={styles.addButton} onPress={() => setShowAdd(true)}>
+          <Plus size={16} color={colors.textPrimary} />
+          <Text style={styles.addButtonText}>Add a place to the map</Text>
+        </TouchableOpacity>
+      )}
 
       {pins.length > 0 && (
         <View style={{ gap: spacing(2) }}>
           {pins.map((p: any) => (
             <View key={p.id} style={styles.pinRow}>
               <Text style={styles.pinName}>{p.name}</Text>
-              <TouchableOpacity onPress={() => removePin(p.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Trash2 size={15} color={colors.stamp} />
-              </TouchableOpacity>
+              {canEdit && (
+                <TouchableOpacity onPress={() => removePin(p.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Trash2 size={15} color={colors.stamp} />
+                </TouchableOpacity>
+              )}
             </View>
           ))}
         </View>

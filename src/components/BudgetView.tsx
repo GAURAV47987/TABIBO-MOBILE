@@ -14,7 +14,7 @@ function fmt(n: number, maxFractionDigits = 0) {
   return n.toLocaleString(undefined, { maximumFractionDigits: maxFractionDigits });
 }
 
-export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budget: any[]) => void }) {
+export default function BudgetView({ trip, onSave, canEdit = true }: { trip: any; onSave: (budget: any[]) => void; canEdit?: boolean }) {
   const budget = trip.budget || [];
   const homeCurrency = trip.home_currency || "USD";
   const { rates } = useFxRates();
@@ -138,10 +138,12 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
-      <PressScale style={styles.addButton} onPress={openNew}>
-        <Plus size={20} color="#fff" strokeWidth={3} />
-        <Text style={styles.addButtonText}>ADD EXPENSE</Text>
-      </PressScale>
+      {canEdit && (
+        <PressScale style={styles.addButton} onPress={openNew}>
+          <Plus size={20} color="#fff" strokeWidth={3} />
+          <Text style={styles.addButtonText}>ADD EXPENSE</Text>
+        </PressScale>
+      )}
 
       {Object.keys(totals).length > 0 && (
         <View style={styles.totalCard}>
@@ -221,7 +223,7 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
 
       <View style={{ gap: spacing(2) }}>
         {visibleExpenses.map((e: any) => (
-          <TouchableOpacity key={e.id} style={styles.expenseRow} onPress={() => openEdit(e)}>
+          <TouchableOpacity key={e.id} style={styles.expenseRow} onPress={() => canEdit && openEdit(e)} disabled={!canEdit}>
             <View style={{ flex: 1 }}>
               <Text style={styles.expenseDesc} numberOfLines={1}>{e.description}</Text>
               <Text style={styles.expenseCategory}>{e.category}</Text>
@@ -231,9 +233,11 @@ export default function BudgetView({ trip, onSave }: { trip: any; onSave: (budge
                 {CURRENCY_SYMBOL[e.currency]}
                 {fmt(parseFloat(e.amount))}
               </Text>
-              <TouchableOpacity onPress={() => removeExpense(e.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Trash2 size={15} color={colors.stamp} />
-              </TouchableOpacity>
+              {canEdit && (
+                <TouchableOpacity onPress={() => removeExpense(e.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Trash2 size={15} color={colors.stamp} />
+                </TouchableOpacity>
+              )}
             </View>
           </TouchableOpacity>
         ))}

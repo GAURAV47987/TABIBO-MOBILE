@@ -232,7 +232,17 @@ function DocModal({
   );
 }
 
-export default function DocumentsView({ trip, offline, onSave }: { trip: any; offline: boolean; onSave: (docs: TripDoc[]) => Promise<void> }) {
+export default function DocumentsView({
+  trip,
+  offline,
+  onSave,
+  canEdit = true,
+}: {
+  trip: any;
+  offline: boolean;
+  onSave: (docs: TripDoc[]) => Promise<void>;
+  canEdit?: boolean;
+}) {
   const docs: TripDoc[] = trip.documents || [];
   const [editing, setEditing] = useState<TripDoc | null | undefined>(undefined);
   const [opening, setOpening] = useState<string | null>(null);
@@ -268,14 +278,16 @@ export default function DocumentsView({ trip, offline, onSave }: { trip: any; of
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
-      <TouchableOpacity
-        style={[styles.addButton, offline && { opacity: 0.5 }]}
-        disabled={offline}
-        onPress={() => setEditing(null)}
-      >
-        <Plus size={18} color="#fff" strokeWidth={3} />
-        <Text style={styles.addButtonText}>ADD DOCUMENT</Text>
-      </TouchableOpacity>
+      {canEdit && (
+        <TouchableOpacity
+          style={[styles.addButton, offline && { opacity: 0.5 }]}
+          disabled={offline}
+          onPress={() => setEditing(null)}
+        >
+          <Plus size={18} color="#fff" strokeWidth={3} />
+          <Text style={styles.addButtonText}>ADD DOCUMENT</Text>
+        </TouchableOpacity>
+      )}
 
       {docs.length === 0 ? (
         <Text style={styles.empty}>
@@ -285,8 +297,9 @@ export default function DocumentsView({ trip, offline, onSave }: { trip: any; of
         <View style={{ gap: spacing(2) }}>
           {docs.map((doc) => {
             const k = kindOf(doc.kind);
+            const onCardPress = canEdit ? () => (offline ? null : setEditing(doc)) : () => (doc.file ? openFile(doc) : null);
             return (
-              <TouchableOpacity key={doc.id} style={styles.card} onPress={() => (offline ? null : setEditing(doc))} activeOpacity={offline ? 1 : 0.7}>
+              <TouchableOpacity key={doc.id} style={styles.card} onPress={onCardPress} activeOpacity={offline && canEdit ? 1 : 0.7}>
                 <View style={styles.cardRow}>
                   <k.Icon size={18} color={colors.stamp} />
                   <View style={{ flex: 1 }}>

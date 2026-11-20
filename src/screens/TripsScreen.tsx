@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, LayoutAnimation } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { Trash2 } from "lucide-react-native";
+import { Trash2, Users } from "lucide-react-native";
 import { colors, radius, spacing } from "../theme";
-import { loadTrips, deleteTrip, updateTrip } from "../lib/supabase";
+import { loadTrips, deleteTrip, updateTrip, getCurrentUserId } from "../lib/supabase";
 import { getEffectiveStops } from "../lib/stops";
 import PlaceBanner from "../components/PlaceBanner";
 import AppHeader from "../components/AppHeader";
@@ -21,6 +21,7 @@ function dateRangeLabel(start?: string | null, end?: string | null) {
 
 type Trip = {
   id: string;
+  user_id: string;
   destination_name: string;
   start_date: string | null;
   end_date: string | null;
@@ -31,6 +32,7 @@ type Trip = {
 export default function TripsScreen() {
   const navigation = useNavigation<any>();
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -42,6 +44,7 @@ export default function TripsScreen() {
       setTrips(data as Trip[]);
       setOffline(fromCache);
       setError("");
+      getCurrentUserId().then(setMyUserId);
     } catch (err: any) {
       setError(err.message || "Could not load your trips");
     } finally {
@@ -123,35 +126,45 @@ export default function TripsScreen() {
       columnWrapperStyle={styles.row}
       contentContainerStyle={styles.list}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); refresh(); }} tintColor={colors.primaryBg} />}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={styles.tile}
-          activeOpacity={0.9}
-          onPress={() => navigation.navigate("TripHub", { tripId: item.id })}
-        >
-          <PlaceBanner
-            placeName={photoQuery(item)}
-            savedUrl={item.photo_url}
-            onResolved={(url) => updateTrip(item.id, { photo_url: url }).catch(() => {})}
-            height={140}
-            style={{ borderRadius: radius.lg }}
+      renderItem={({ item }) => {
+        const isOwner = !myUserId || item.user_id === myUserId;
+        return (
+          <TouchableOpacity
+            style={styles.tile}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate("TripHub", { tripId: item.id })}
           >
-            <TouchableOpacity
-              onPress={() => confirmDelete(item)}
-              style={styles.deleteButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            <PlaceBanner
+              placeName={photoQuery(item)}
+              savedUrl={item.photo_url}
+              onResolved={(url) => updateTrip(item.id, { photo_url: url }).catch(() => {})}
+              height={140}
+              style={{ borderRadius: radius.lg }}
             >
-              <Trash2 size={14} color="#fff" />
-            </TouchableOpacity>
-            <View style={styles.tileText}>
-              <Text style={styles.tileTitle} numberOfLines={1}>
-                {item.destination_name}
-              </Text>
-              <Text style={styles.tileDate}>{dateRangeLabel(item.start_date, item.end_date)}</Text>
-            </View>
-          </PlaceBanner>
-        </TouchableOpacity>
-      )}
+              {isOwner ? (
+                <TouchableOpacity
+                  onPress={() => confirmDelete(item)}
+                  style={styles.deleteButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Trash2 size={14} color="#fff" />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.sharedBadge}>
+                  <Users size={11} color="#fff" />
+                  <Text style={styles.sharedBadgeText}>Shared</Text>
+                </View>
+              )}
+              <View style={styles.tileText}>
+                <Text style={styles.tileTitle} numberOfLines={1}>
+                  {item.destination_name}
+                </Text>
+                <Text style={styles.tileDate}>{dateRangeLabel(item.start_date, item.end_date)}</Text>
+              </View>
+            </PlaceBanner>
+          </TouchableOpacity>
+        );
+      }}
       />
     </View>
   );
@@ -200,6 +213,20 @@ const styles = StyleSheet.create({
     padding: spacing(1.5),
     zIndex: 10,
   },
+  sharedBadge: {
+    position: "absolute",
+    top: spacing(2),
+    right: spacing(2),
+    zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1),
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 999,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+  },
+  sharedBadgeText: { color: "#fff", fontSize: 10, fontWeight: "600" },
   tileText: {
     position: "absolute",
     left: 0,
