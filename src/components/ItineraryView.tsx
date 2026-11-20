@@ -322,31 +322,33 @@ export default function ItineraryView({
   };
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
-      <Toolbar trip={trip} />
-      {canEdit && <AIGenerateCard trip={trip} onGenerated={(newItems) => onSave([...items, ...newItems])} />}
+    <View style={{ flex: 1 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
+        <Toolbar trip={trip} />
+        {canEdit && <AIGenerateCard trip={trip} onGenerated={(newItems) => onSave([...items, ...newItems])} />}
 
-      {days.map((date, i) => (
-        <DayCard
-          key={date}
-          date={date}
-          dayNumber={i + 1}
-          stopName={showStopLabel ? getStopForDate(stops, date)?.name : null}
-          items={items.filter((it: any) => it.date === date)}
-          onAdd={(d) => setModalDate(d)}
-          onEdit={(item) => {
-            setModalDate(item.date);
-            setEditingItem(item);
-          }}
-          onReorder={(orderedIds) => handleReorder(date, orderedIds)}
-          canEdit={canEdit}
-        />
-      ))}
+        {days.map((date, i) => (
+          <DayCard
+            key={date}
+            date={date}
+            dayNumber={i + 1}
+            stopName={showStopLabel ? getStopForDate(stops, date)?.name : null}
+            items={items.filter((it: any) => it.date === date)}
+            onAdd={(d) => setModalDate(d)}
+            onEdit={(item) => {
+              setModalDate(item.date);
+              setEditingItem(item);
+            }}
+            onReorder={(orderedIds) => handleReorder(date, orderedIds)}
+            canEdit={canEdit}
+          />
+        ))}
+      </ScrollView>
 
       {modalDate && (
         <ItemModal date={modalDate} initial={editingItem} onSave={handleSave} onDelete={handleDelete} onClose={closeModal} readOnly={!canEdit} />
       )}
-    </ScrollView>
+    </View>
   );
 }
 

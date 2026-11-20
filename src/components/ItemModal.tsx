@@ -1,8 +1,15 @@
-import { useRef, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, BackHandler } from "react-native";
 import { colors, radius, spacing } from "../theme";
 import { geocodeDestination } from "../lib/geocode";
 import TimeField from "./TimeField";
+
+// Deliberately NOT RN's core <Modal>: Expo Go's own native Modal host has a
+// use-after-free crash (objc_retain on a deallocated object, confirmed from
+// a device crash log) that reproduces exactly with a focused TextInput
+// inside it. A plain absolutely-positioned overlay, rendered by the parent
+// screen outside its ScrollView, gives the same full-screen popup without
+// going anywhere near that native code path.
 
 export default function ItemModal({
   date,
@@ -26,6 +33,20 @@ export default function ItemModal({
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeError, setGeocodeError] = useState("");
   const titleRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (readOnly) return;
+    const t = setTimeout(() => titleRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [readOnly]);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onClose]);
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -58,13 +79,7 @@ export default function ItemModal({
   };
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      onShow={() => !readOnly && titleRef.current?.focus()}
-    >
+    <View style={styles.overlayWrap}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.overlay}
@@ -150,11 +165,20 @@ export default function ItemModal({
           )}
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  overlayWrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
+    elevation: 50,
+  },
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
