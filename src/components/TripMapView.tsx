@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, ScrollView, Linking, Platform, Alert } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Linking, Platform, Alert, BackHandler } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Plus, Trash2, Navigation } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
@@ -39,7 +39,23 @@ export default function TripMapView({ trip, onSave, canEdit = true }: { trip: an
 
   const stops = getEffectiveStops(trip);
   const mapRef = useRef<MapView>(null);
+  const nameRef = useRef<any>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showAdd) return;
+    const t = setTimeout(() => nameRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [showAdd]);
+
+  useEffect(() => {
+    if (!showAdd) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setShowAdd(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [showAdd]);
 
   const itineraryStops = useMemo(
     () =>
@@ -95,6 +111,7 @@ export default function TripMapView({ trip, onSave, canEdit = true }: { trip: an
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
       <MapView
         ref={mapRef}
@@ -225,31 +242,35 @@ export default function TripMapView({ trip, onSave, canEdit = true }: { trip: an
         </View>
       )}
 
-      <Modal visible={showAdd} transparent animationType="fade" onRequestClose={() => setShowAdd(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Add a place</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Uluwatu Temple"
-              placeholderTextColor={colors.textFaint}
-              value={name}
-              onChangeText={setName}
-              autoFocus
-            />
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowAdd(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.submitButton, busy && { opacity: 0.6 }]} onPress={addPin} disabled={busy}>
-                <Text style={styles.submitText}>{busy ? "Finding…" : "Add pin"}</Text>
-              </TouchableOpacity>
+    </ScrollView>
+
+      {showAdd && (
+        <View style={styles.modalWrap}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Add a place</Text>
+              <TextInput
+                ref={nameRef}
+                style={styles.input}
+                placeholder="e.g. Uluwatu Temple"
+                placeholderTextColor={colors.textFaint}
+                value={name}
+                onChangeText={setName}
+              />
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelButton} onPress={() => setShowAdd(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.submitButton, busy && { opacity: 0.6 }]} onPress={addPin} disabled={busy}>
+                  <Text style={styles.submitText}>{busy ? "Finding…" : "Add pin"}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
-      </Modal>
-    </ScrollView>
+      )}
+    </View>
   );
 }
 
@@ -302,6 +323,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   pinName: { fontSize: 14, color: colors.textBody },
+  modalWrap: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, elevation: 50 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center", padding: spacing(4) },
   modalCard: { width: "100%", maxWidth: 400, backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing(6), borderWidth: 1, borderColor: colors.border },
   modalTitle: { fontSize: 18, fontWeight: "700", color: colors.textPrimary, marginBottom: spacing(4) },

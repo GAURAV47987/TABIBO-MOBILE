@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, LayoutAnimation } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, LayoutAnimation, BackHandler } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { Plus, Wallet, X, Trash2, Printer } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
@@ -23,6 +23,15 @@ export default function BudgetView({ trip, onSave, canEdit = true }: { trip: any
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ description: "", amount: "", currency: homeCurrency, category: "Activities" });
+
+  useEffect(() => {
+    if (!showForm) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setShowForm(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [showForm]);
 
   const openEdit = (expense: any) => {
     setForm({ description: expense.description, amount: String(expense.amount), currency: expense.currency, category: expense.category });
@@ -137,6 +146,7 @@ export default function BudgetView({ trip, onSave, canEdit = true }: { trip: any
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(4) }}>
       {canEdit && (
         <PressScale style={styles.addButton} onPress={openNew}>
@@ -243,57 +253,61 @@ export default function BudgetView({ trip, onSave, canEdit = true }: { trip: any
         ))}
       </View>
 
-      <Modal visible={showForm} transparent animationType="fade" onRequestClose={() => setShowForm(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editingId ? "Edit expense" : "New expense"}</Text>
-              <TouchableOpacity onPress={() => setShowForm(false)}>
-                <X size={18} color={colors.textTertiary} />
-              </TouchableOpacity>
-            </View>
+    </ScrollView>
 
-            <TextInput
-              style={styles.input}
-              placeholder="What was it for?"
-              placeholderTextColor={colors.textFaint}
-              value={form.description}
-              onChangeText={(v) => setForm({ ...form, description: v })}
-            />
+      {showForm && (
+        <View style={styles.modalWrap}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{editingId ? "Edit expense" : "New expense"}</Text>
+                <TouchableOpacity onPress={() => setShowForm(false)}>
+                  <X size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
 
-            <View style={styles.amountRow}>
               <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Amount"
+                style={styles.input}
+                placeholder="What was it for?"
                 placeholderTextColor={colors.textFaint}
-                keyboardType="decimal-pad"
-                value={form.amount}
-                onChangeText={(v) => setForm({ ...form, amount: v })}
+                value={form.description}
+                onChangeText={(v) => setForm({ ...form, description: v })}
               />
-              <View style={styles.pickerWrap}>
-                <Picker selectedValue={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })} style={{ color: colors.textBody }}>
-                  {CURRENCIES.map((c) => (
+
+              <View style={styles.amountRow}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="Amount"
+                  placeholderTextColor={colors.textFaint}
+                  keyboardType="decimal-pad"
+                  value={form.amount}
+                  onChangeText={(v) => setForm({ ...form, amount: v })}
+                />
+                <View style={styles.pickerWrap}>
+                  <Picker selectedValue={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })} style={{ color: colors.textBody }}>
+                    {CURRENCIES.map((c) => (
+                      <Picker.Item key={c} label={c} value={c} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+
+              <View style={[styles.pickerWrap, { marginBottom: spacing(3) }]}>
+                <Picker selectedValue={form.category} onValueChange={(v) => setForm({ ...form, category: v })} style={{ color: colors.textBody }}>
+                  {CATEGORIES.map((c) => (
                     <Picker.Item key={c} label={c} value={c} />
                   ))}
                 </Picker>
               </View>
-            </View>
 
-            <View style={[styles.pickerWrap, { marginBottom: spacing(3) }]}>
-              <Picker selectedValue={form.category} onValueChange={(v) => setForm({ ...form, category: v })} style={{ color: colors.textBody }}>
-                {CATEGORIES.map((c) => (
-                  <Picker.Item key={c} label={c} value={c} />
-                ))}
-              </Picker>
+              <PressScale style={styles.submitButton} onPress={submit}>
+                <Text style={styles.submitText}>{editingId ? "Save changes" : "Add expense"}</Text>
+              </PressScale>
             </View>
-
-            <PressScale style={styles.submitButton} onPress={submit}>
-              <Text style={styles.submitText}>{editingId ? "Save changes" : "Add expense"}</Text>
-            </PressScale>
           </View>
         </View>
-      </Modal>
-    </ScrollView>
+      )}
+    </View>
   );
 }
 
@@ -393,6 +407,7 @@ const styles = StyleSheet.create({
   expenseCategory: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
   expenseRight: { flexDirection: "row", alignItems: "center", gap: spacing(3) },
   expenseAmount: { fontSize: 14, fontWeight: "500", color: colors.textBody },
+  modalWrap: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, elevation: 50 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center", padding: spacing(4) },
   modalCard: { width: "100%", maxWidth: 400, backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing(5), borderWidth: 1, borderColor: colors.border },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing(3) },
