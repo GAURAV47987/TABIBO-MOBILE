@@ -49,20 +49,21 @@ function openTripFromNotification(response: Notifications.NotificationResponse |
 }
 
 // The "+" isn't one of the flex tabs — it's a sibling overlay, centered on
-// the screen. With only Trips/Explore as visible tabs, screen-center falls
-// in the gap between them, which is also why Home isn't a third visible
-// tab here: a 3-way-even bar puts a tab dead center too, exactly where the
-// FAB sits, and they'd collide. Home stays reachable as a registered
-// (but tab-bar-hidden) route — the default on sign-in, and reachable by
-// tapping the TABIGO logo — matching the web app's own nav (Trips/+/
-// Explore in the bar, Home via the logo).
+// the screen. Only Trips/Explore are tabs here — with two evenly-flexed
+// tabs, their shared boundary is screen-center, exactly where the FAB
+// sits, and the gap stays clear. Home is NOT a Tab.Screen (even a
+// tabBarButton:null one still reserves its flex slot, which pushed Trips
+// off-center and under the FAB) — it lives one level up, as its own
+// RootStack screen, and is reachable by tapping the TABIGO logo (see
+// AppHeader) — matching the web app's own nav (Trips/+/Explore in the
+// bar, Home via the logo).
 function MainTabs() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
-        initialRouteName="Home"
+        initialRouteName="Trips"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: colors.stamp,
@@ -71,11 +72,6 @@ function MainTabs() {
         }}
         screenListeners={{ tabPress: () => haptics.select() }}
       >
-        <Tab.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{ tabBarButton: () => null }}
-        />
         <Tab.Screen
           name="Trips"
           component={TripsScreen}
@@ -149,7 +145,8 @@ function App() {
           onReady={() => Notifications.getLastNotificationResponseAsync().then(openTripFromNotification).catch(() => {})}
         >
           {session ? (
-            <RootStack.Navigator screenOptions={{ headerShown: false }}>
+            <RootStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Home">
+              <RootStack.Screen name="Home" component={HomeScreen} />
               <RootStack.Screen name="MainTabs" component={MainTabs} />
               <RootStack.Screen name="TripHub" component={TripHubScreen} />
               <RootStack.Screen name="NewTrip" component={NewTripScreen} options={{ presentation: "modal" }} />
