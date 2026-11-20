@@ -14,7 +14,7 @@ import PressScale from "../components/PressScale";
 import { haptics } from "../lib/haptics";
 import { scheduleAbandonedPlanningNudge, schedulePostTripNudge } from "../lib/reminders";
 
-const STEPS = ["Destination", "Route", "Dates", "Add-ons"];
+const STEPS = ["Destination", "Dates", "Route", "Add-ons"];
 
 type Stop = { name: string; lat: number; lng: number; days: number };
 
@@ -126,6 +126,7 @@ export default function NewTripScreen({ navigation }: any) {
   const [newStopName, setNewStopName] = useState("");
   const [tripName, setTripName] = useState("");
   const [startDate, setStartDate] = useState("");
+  const [totalDays, setTotalDays] = useState(7);
   const [homeCurrency, setHomeCurrency] = useState("USD");
   const [climate, setClimate] = useState<any>(null);
   const [suggestions, setSuggestions] = useState<any[] | null>(null);
@@ -168,7 +169,7 @@ export default function NewTripScreen({ navigation }: any) {
   };
 
   useEffect(() => {
-    if (step !== 3 || !startDate || !stops[0]) {
+    if (step !== 2 || !startDate || !stops[0]) {
       setClimate(null);
       return;
     }
@@ -244,6 +245,24 @@ export default function NewTripScreen({ navigation }: any) {
       ? `Expect around ${Math.round(climate.avgHigh)}°C${climate.rainyDays > 0 ? ", some rain" : ", mostly dry"}.`
       : null;
 
+  const daysPlanned = stops.reduce((sum, s) => sum + s.days, 0);
+  const daysPlannedNote =
+    daysPlanned === totalDays
+      ? `${daysPlanned} of ${totalDays} days planned — nice, that's all of it.`
+      : daysPlanned < totalDays
+      ? `${daysPlanned} of ${totalDays} days planned — ${totalDays - daysPlanned} day${totalDays - daysPlanned === 1 ? "" : "s"} left to assign.`
+      : `${daysPlanned} of ${totalDays} days planned — ${daysPlanned - totalDays} day${daysPlanned - totalDays === 1 ? "" : "s"} over; that's fine, your trip will just run a bit longer.`;
+
+  // Moving from Dates to Route: only the single default stop exists so
+  // far (nothing split out yet), so hand it the full day count the user
+  // just chose — it's then theirs to redistribute as they add stops.
+  // Once they've already split days across more than one stop, this step
+  // leaves that allocation alone rather than clobbering it on Back/Next.
+  const continueToRoute = () => {
+    if (stops.length === 1) setStops([{ ...stops[0], days: totalDays }]);
+    setStep(3);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.header}>
@@ -273,33 +292,6 @@ export default function NewTripScreen({ navigation }: any) {
 
         {step === 2 && (
           <View>
-            <Text style={styles.title}>Your route</Text>
-            <View style={{ marginBottom: spacing(4), borderRadius: radius.lg, overflow: "hidden" }}>
-              <PlaceBanner placeName={stops[0]?.name} height={150} />
-            </View>
-
-            <JourneyStrip stops={stops} onChangeDays={changeDays} onRemove={removeStop} />
-
-            {addingStop ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2), marginTop: spacing(2) }}>
-                <View style={{ flex: 1 }}>
-                  <PlaceAutocomplete autoFocus placeholder="e.g. Paris" value={newStopName} onChangeText={setNewStopName} onPick={addStop} />
-                </View>
-                <TouchableOpacity onPress={() => setAddingStop(false)}>
-                  <X size={18} color={colors.textTertiary} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.addStopLink} onPress={() => setAddingStop(true)}>
-                <Plus size={14} color={colors.textSecondary} />
-                <Text style={styles.addStopText}>Add another stop</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {step === 3 && (
-          <View>
             <Text style={styles.title}>When are you going?</Text>
 
             <Text style={styles.label}>Trip name (optional)</Text>
@@ -319,6 +311,18 @@ export default function NewTripScreen({ navigation }: any) {
               <Text style={styles.hintText}>Not sure yet? Skip this — you can add dates later from the trip's Itinerary tab.</Text>
             )}
 
+            <Text style={[styles.label, { marginTop: spacing(3) }]}>How many days is this trip?</Text>
+            <View style={styles.totalDaysRow}>
+              <TouchableOpacity style={styles.stepperButton} onPress={() => setTotalDays((d) => Math.max(1, d - 1))}>
+                <Text style={styles.stepperText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.totalDaysLabel}>{totalDays} day{totalDays === 1 ? "" : "s"}</Text>
+              <TouchableOpacity style={styles.stepperButton} onPress={() => setTotalDays((d) => d + 1)}>
+                <Text style={styles.stepperText}>+</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.hintText}>Next, you'll split these days across every place you're visiting.</Text>
+
             <Text style={[styles.label, { marginTop: spacing(3) }]}>Home currency (for budget totals)</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {CURRENCIES.map((c: string) => (
@@ -331,6 +335,34 @@ export default function NewTripScreen({ navigation }: any) {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
+        )}
+
+        {step === 3 && (
+          <View>
+            <Text style={styles.title}>Your route</Text>
+            <View style={{ marginBottom: spacing(4), borderRadius: radius.lg, overflow: "hidden" }}>
+              <PlaceBanner placeName={stops[0]?.name} height={150} />
+            </View>
+            <Text style={styles.hintText}>{daysPlannedNote}</Text>
+
+            <JourneyStrip stops={stops} onChangeDays={changeDays} onRemove={removeStop} />
+
+            {addingStop ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2), marginTop: spacing(2) }}>
+                <View style={{ flex: 1 }}>
+                  <PlaceAutocomplete autoFocus placeholder="e.g. Paris" value={newStopName} onChangeText={setNewStopName} onPick={addStop} />
+                </View>
+                <TouchableOpacity onPress={() => setAddingStop(false)}>
+                  <X size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.addStopLink} onPress={() => setAddingStop(true)}>
+                <Plus size={14} color={colors.textSecondary} />
+                <Text style={styles.addStopText}>Add another stop</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -395,12 +427,12 @@ export default function NewTripScreen({ navigation }: any) {
           </TouchableOpacity>
         )}
         {step === 2 && (
-          <TouchableOpacity style={[styles.nextButton, stops.length === 0 && { opacity: 0.6 }]} onPress={() => setStep(3)} disabled={stops.length === 0}>
+          <TouchableOpacity style={styles.nextButton} onPress={continueToRoute}>
             <Text style={styles.nextButtonText}>Next</Text>
           </TouchableOpacity>
         )}
         {step === 3 && (
-          <TouchableOpacity style={styles.nextButton} onPress={() => setStep(4)}>
+          <TouchableOpacity style={[styles.nextButton, stops.length === 0 && { opacity: 0.6 }]} onPress={() => setStep(4)} disabled={stops.length === 0}>
             <Text style={styles.nextButtonText}>Next</Text>
           </TouchableOpacity>
         )}
@@ -478,6 +510,8 @@ const styles = StyleSheet.create({
   removeLink: { fontSize: 10, color: colors.stamp, textDecorationLine: "underline", marginTop: spacing(1) },
   addStopLink: { flexDirection: "row", alignItems: "center", gap: spacing(1), marginTop: spacing(2) },
   addStopText: { fontSize: 14, color: colors.textSecondary },
+  totalDaysRow: { flexDirection: "row", alignItems: "center", gap: spacing(3) },
+  totalDaysLabel: { fontSize: 16, fontWeight: "600", color: colors.textPrimary, minWidth: 64 },
   currencyChip: {
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.5),
