@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, LayoutAnimation } from "react-native";
 import { Luggage, CheckCircle2, Circle } from "lucide-react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { buildPackingCategories } from "../lib/constants";
 import { getTripClimate } from "../lib/weather";
 import { haptics } from "../lib/haptics";
 import ProgressRing from "./ProgressRing";
 
 export default function PackingView({ trip, onSave, canEdit = true }: { trip: any; onSave: (packing: Record<string, boolean>) => void; canEdit?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const checklist = trip.packing || {};
   const [climate, setClimate] = useState<any>(undefined); // undefined = loading, null = unavailable
 
@@ -96,7 +98,8 @@ export default function PackingView({ trip, onSave, canEdit = true }: { trip: an
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   climateNote: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing(4) },
   progressRow: { flexDirection: "row", alignItems: "center", gap: spacing(4), marginBottom: spacing(5) },
   progressCount: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },

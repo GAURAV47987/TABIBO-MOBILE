@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Modal } from "react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { signIn, signUp, resetPasswordForEmail } from "../lib/supabase";
 import { LegalDocument } from "./LegalScreen";
 import type { LegalDocId } from "../lib/legal";
@@ -8,6 +8,8 @@ import { haptics } from "../lib/haptics";
 import PressScale from "../components/PressScale";
 
 export default function AuthScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [legalDoc, setLegalDoc] = useState<LegalDocId | null>(null);
   const [email, setEmail] = useState("");
@@ -200,7 +202,8 @@ export default function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   legalText: { fontSize: 12, color: colors.textMuted, textAlign: "center", marginTop: spacing(4), lineHeight: 18 },
   legalLink: { color: colors.textSecondary, textDecorationLine: "underline" },
   screen: {

@@ -1,8 +1,9 @@
+import { useMemo } from "react";
 import { Text, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { User } from "lucide-react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 
 // Shared top bar for the Home and Trips tabs — mirrors the web Dashboard's
 // header (logo + profile button, admin link added once isAdmin lands here).
@@ -11,6 +12,8 @@ import { colors, radius, spacing } from "../theme";
 // notched phones.
 export default function AppHeader() {
   const navigation = useNavigation<any>();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   return (
     <SafeAreaView edges={["top"]} style={styles.row}>
       <TouchableOpacity onPress={() => navigation.navigate("Home")} accessibilityLabel="Go to home">
@@ -27,24 +30,25 @@ export default function AppHeader() {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing(4),
-    paddingTop: spacing(3),
-    paddingBottom: spacing(3),
-  },
-  logo: { fontSize: 22, fontWeight: "800", color: colors.primaryBg, letterSpacing: 0.5 },
-  profileButton: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-});
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: spacing(4),
+      paddingTop: spacing(3),
+      paddingBottom: spacing(3),
+    },
+    logo: { fontSize: 22, fontWeight: "800", color: colors.primaryBg, letterSpacing: 0.5 },
+    profileButton: {
+      width: 34,
+      height: 34,
+      borderRadius: radius.lg,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+  });

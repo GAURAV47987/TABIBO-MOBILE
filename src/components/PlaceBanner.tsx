@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Image, StyleSheet, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { colors, radius } from "../theme";
+import { useTheme, radius, type Colors } from "../theme";
 import { getPlacePhoto } from "../lib/photos";
 
 // A photo banner for a place. savedUrl is the trip's own persisted
@@ -24,6 +24,8 @@ export default function PlaceBanner({
   style?: ViewStyle;
   children?: React.ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [url, setUrl] = useState<string | null | undefined>(savedUrl ?? null);
 
   useEffect(() => {
@@ -69,7 +71,8 @@ export default function PlaceBanner({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   wrap: {
     width: "100%",
     overflow: "hidden",

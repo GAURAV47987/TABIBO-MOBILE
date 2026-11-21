@@ -2,13 +2,15 @@ import { useMemo, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { ArrowLeftRight, RefreshCw, Wallet } from "lucide-react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { CURRENCIES, CURRENCY_SYMBOL } from "../lib/constants";
 import { useFxRates } from "../lib/fx";
 
 const QUICK_AMOUNTS = [10, 20, 50, 100];
 
 export default function ConvertView({ homeCurrency }: { homeCurrency: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const { rates, updatedAt, status, errorDetail, refetch } = useFxRates();
   const [amount, setAmount] = useState("100");
   const [from, setFrom] = useState(homeCurrency);
@@ -129,7 +131,8 @@ export default function ConvertView({ homeCurrency }: { homeCurrency: string }) 
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   statusText: { fontSize: 13, color: colors.textSecondary, marginBottom: 2 },
   errorText: { fontSize: 11, color: colors.stamp, marginBottom: spacing(4) },
   card: {

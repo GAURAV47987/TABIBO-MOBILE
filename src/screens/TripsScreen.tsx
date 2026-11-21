@@ -1,8 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, LayoutAnimation } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Trash2, Users } from "lucide-react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { loadTrips, deleteTrip, updateTrip, getCurrentUserId } from "../lib/supabase";
 import { getEffectiveStops } from "../lib/stops";
 import PlaceBanner from "../components/PlaceBanner";
@@ -30,6 +30,8 @@ type Trip = {
 };
 
 export default function TripsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const navigation = useNavigation<any>();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [myUserId, setMyUserId] = useState<string | null>(null);
@@ -170,7 +172,8 @@ export default function TripsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   offlineText: { fontSize: 12, color: colors.textSecondary, paddingHorizontal: spacing(4), paddingTop: spacing(2) },
   center: {
     flex: 1,

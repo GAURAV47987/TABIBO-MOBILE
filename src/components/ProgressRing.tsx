@@ -1,8 +1,11 @@
+import { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Svg, { Circle } from "react-native-svg";
-import { colors } from "../theme";
+import { useTheme, type Colors } from "../theme";
 
 export default function ProgressRing({ pct, size = 64, strokeWidth = 6 }: { pct: number; size?: number; strokeWidth?: number }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - pct / 100);
@@ -32,7 +35,8 @@ export default function ProgressRing({ pct, size = 64, strokeWidth = 6 }: { pct:
   );
 }
 
-const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  text: { fontSize: 12, fontWeight: "500", color: colors.textPrimary },
-});
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
+    center: { flex: 1, alignItems: "center", justifyContent: "center" },
+    text: { fontSize: 12, fontWeight: "500", color: colors.textPrimary },
+  });

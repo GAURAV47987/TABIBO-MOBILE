@@ -1,8 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { X, UserPlus, Trash2 } from "lucide-react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { inviteTripCollaborator, listTripCollaborators, updateCollaboratorRole, removeCollaborator } from "../lib/supabase";
 import { haptics } from "../lib/haptics";
 import PressScale from "../components/PressScale";
@@ -10,6 +10,8 @@ import PressScale from "../components/PressScale";
 type Collaborator = { id: string; role: string; status: string; email: string };
 
 export default function ShareScreen({ route, navigation }: any) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const { tripId, destinationName } = route.params;
   const [collaborators, setCollaborators] = useState<Collaborator[] | null>(null);
   const [email, setEmail] = useState("");
@@ -149,7 +151,8 @@ export default function ShareScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "flex-start",

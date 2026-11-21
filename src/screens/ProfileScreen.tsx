@@ -1,14 +1,23 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { User, X } from "lucide-react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors, type ThemeMode } from "../theme";
 import { signOut, changePassword, getAvatarUrl, uploadAvatar, deleteMyAccount } from "../lib/supabase";
 import { isAdmin } from "../lib/admin";
 import { haptics } from "../lib/haptics";
 import PressScale from "../components/PressScale";
 
+const THEME_MODES: { value: ThemeMode; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+
 export default function ProfileScreen({ session, navigation }: any) {
+  const { colors, mode, setMode } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+
   const [avatarUrl, setAvatarUrl] = useState(() => getAvatarUrl(session.user.id));
   const [avatarBroken, setAvatarBroken] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -163,6 +172,21 @@ export default function ProfileScreen({ session, navigation }: any) {
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.cardTitle}>Appearance</Text>
+          <View style={styles.modeRow}>
+            {THEME_MODES.map((m) => (
+              <TouchableOpacity
+                key={m.value}
+                style={[styles.modeButton, mode === m.value && styles.modeButtonActive]}
+                onPress={() => setMode(m.value)}
+              >
+                <Text style={[styles.modeButtonText, mode === m.value && styles.modeButtonTextActive]}>{m.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.cardTitle}>Change password</Text>
 
           <Text style={styles.label}>New password</Text>
@@ -227,85 +251,99 @@ export default function ProfileScreen({ session, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing(4),
-    paddingTop: spacing(6),
-    paddingBottom: spacing(3),
-  },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
-  avatarWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    overflow: "hidden",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing(2),
-  },
-  avatarFallback: { flex: 1, alignItems: "center", justifyContent: "center" },
-  avatarOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  linkText: { color: colors.textSecondary, fontSize: 14, textDecorationLine: "underline" },
-  card: {
-    padding: spacing(4),
-    borderRadius: radius.lg,
-    marginBottom: spacing(4),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  fieldLabel: { fontSize: 11, color: colors.textMuted },
-  fieldValue: { fontSize: 15, fontWeight: "500", color: colors.textPrimary },
-  cardTitle: { fontSize: 15, fontWeight: "700", color: colors.textPrimary, marginBottom: spacing(3) },
-  label: { fontSize: 14, color: colors.textTertiary, marginBottom: spacing(1) },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-    color: colors.textBody,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 16,
-    marginBottom: spacing(3),
-  },
-  errorText: { color: colors.stamp, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(2) },
-  successText: { color: colors.textPrimary, fontSize: 13, marginBottom: spacing(2) },
-  primaryButton: { backgroundColor: colors.primaryBg, borderRadius: radius.md, paddingVertical: spacing(2.5), alignItems: "center" },
-  primaryButtonText: { color: colors.primaryText, fontWeight: "600" },
-  adminButton: {
-    paddingVertical: spacing(3),
-    borderRadius: radius.md,
-    alignItems: "center",
-    marginBottom: spacing(3),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.stamp,
-  },
-  adminButtonText: { color: colors.stamp, fontWeight: "600" },
-  signOutButton: {
-    paddingVertical: spacing(3),
-    borderRadius: radius.md,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  signOutText: { color: colors.stamp, fontWeight: "600" },
-  legalRow: { flexDirection: "row", justifyContent: "center", gap: spacing(6), marginTop: spacing(6) },
-  deleteAccountButton: { alignItems: "center", paddingVertical: spacing(4), marginTop: spacing(2), marginBottom: spacing(6) },
-  deleteAccountText: { color: colors.stamp, fontSize: 14 },
-});
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: spacing(4),
+      paddingTop: spacing(6),
+      paddingBottom: spacing(3),
+    },
+    headerTitle: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
+    avatarWrap: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      overflow: "hidden",
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: spacing(2),
+    },
+    avatarFallback: { flex: 1, alignItems: "center", justifyContent: "center" },
+    avatarOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    linkText: { color: colors.textSecondary, fontSize: 14, textDecorationLine: "underline" },
+    card: {
+      padding: spacing(4),
+      borderRadius: radius.lg,
+      marginBottom: spacing(4),
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    fieldLabel: { fontSize: 11, color: colors.textMuted },
+    fieldValue: { fontSize: 15, fontWeight: "500", color: colors.textPrimary },
+    cardTitle: { fontSize: 15, fontWeight: "700", color: colors.textPrimary, marginBottom: spacing(3) },
+    modeRow: { flexDirection: "row", gap: spacing(2) },
+    modeButton: {
+      flex: 1,
+      paddingVertical: spacing(2.5),
+      borderRadius: radius.md,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bg,
+    },
+    modeButtonActive: { backgroundColor: colors.primaryBg, borderColor: colors.primaryBg },
+    modeButtonText: { fontSize: 13, fontWeight: "600", color: colors.textBody },
+    modeButtonTextActive: { color: colors.primaryText },
+    label: { fontSize: 14, color: colors.textTertiary, marginBottom: spacing(1) },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bg,
+      color: colors.textBody,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing(3),
+      paddingVertical: spacing(2.5),
+      fontSize: 16,
+      marginBottom: spacing(3),
+    },
+    errorText: { color: colors.stamp, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(2) },
+    successText: { color: colors.textPrimary, fontSize: 13, marginBottom: spacing(2) },
+    primaryButton: { backgroundColor: colors.primaryBg, borderRadius: radius.md, paddingVertical: spacing(2.5), alignItems: "center" },
+    primaryButtonText: { color: colors.primaryText, fontWeight: "600" },
+    adminButton: {
+      paddingVertical: spacing(3),
+      borderRadius: radius.md,
+      alignItems: "center",
+      marginBottom: spacing(3),
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.stamp,
+    },
+    adminButtonText: { color: colors.stamp, fontWeight: "600" },
+    signOutButton: {
+      paddingVertical: spacing(3),
+      borderRadius: radius.md,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    signOutText: { color: colors.stamp, fontWeight: "600" },
+    legalRow: { flexDirection: "row", justifyContent: "center", gap: spacing(6), marginTop: spacing(6) },
+    deleteAccountButton: { alignItems: "center", paddingVertical: spacing(4), marginTop: spacing(2), marginBottom: spacing(6) },
+    deleteAccountText: { color: colors.stamp, fontSize: 14 },
+  });

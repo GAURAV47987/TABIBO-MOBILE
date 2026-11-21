@@ -1,9 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from "react-native";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar, Wallet, ArrowLeftRight, Map as MapIcon, Luggage, FileText, WifiOff, Users } from "lucide-react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { loadTrip, updateTrip, patchCachedTrip, getMyTripRole, leaveTrip, type TripRole } from "../lib/supabase";
 import { syncTripReminders, cancelAbandonedPlanningNudge, schedulePostTripNudge } from "../lib/reminders";
 import { haptics } from "../lib/haptics";
@@ -34,6 +34,8 @@ const TRIP_TABS = [
 ];
 
 export default function TripHubScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const navigation = useNavigation();
   const route = useRoute<any>();
   const { tripId } = route.params;
@@ -215,7 +217,8 @@ export default function TripHubScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   bannerWrap: { margin: spacing(4) },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },

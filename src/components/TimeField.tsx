@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 
 // value/onChange use the same "HH:MM" (24h) string shape as the rest of
 // the app (itinerary item.time etc.) — wraps the native time picker UI
 // around that string, same pattern as DateField.
 export default function TimeField({ value, onChange, placeholder = "Select a time" }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [show, setShow] = useState(false);
   const timeValue = (() => {
     const d = new Date();
@@ -42,17 +44,18 @@ export default function TimeField({ value, onChange, placeholder = "Select a tim
   );
 }
 
-const styles = StyleSheet.create({
-  field: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-  },
-  valueText: { color: colors.textBody, fontSize: 16 },
-  placeholderText: { color: colors.textFaint, fontSize: 16 },
-  doneButton: { alignSelf: "flex-end", paddingVertical: spacing(1.5), paddingHorizontal: spacing(3) },
-  doneText: { color: colors.primaryBg, fontWeight: "600" },
-});
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
+    field: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bg,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing(3),
+      paddingVertical: spacing(2.5),
+    },
+    valueText: { color: colors.textBody, fontSize: 16 },
+    placeholderText: { color: colors.textFaint, fontSize: 16 },
+    doneButton: { alignSelf: "flex-end", paddingVertical: spacing(1.5), paddingHorizontal: spacing(3) },
+    doneText: { color: colors.primaryBg, fontWeight: "600" },
+  });

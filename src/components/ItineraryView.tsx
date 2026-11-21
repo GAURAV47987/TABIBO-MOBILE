@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, LayoutAnimation } from "react-native";
 import { Camera, MapPin, Utensils, Bell, BellOff, Printer, ChevronUp, ChevronDown } from "lucide-react-native";
 import { areTripRemindersEnabled, enableTripReminders, cancelTripReminders } from "../lib/reminders";
 import { randomUUID } from "expo-crypto";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { enumerateDates } from "../lib/dates";
 import { getEffectiveStops, getStopForDate } from "../lib/stops";
 import { escapeHtml, exportHtmlAsPdf } from "../lib/pdf";
@@ -33,6 +33,8 @@ function formatDay(dateStr: string, dayNumber: number) {
 }
 
 function SetDatesPrompt({ onSet }: { onSet: (startDate: string) => Promise<void> }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [startDate, setStartDate] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -76,6 +78,8 @@ function DayCard({
   onReorder: (orderedIds: string[]) => void;
   canEdit: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const sorted = sortDayItems(items);
 
   const move = (index: number, delta: number) => {
@@ -205,6 +209,8 @@ async function exportItineraryPDF(trip: any) {
 }
 
 function Toolbar({ trip }: { trip: any }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [reminders, setReminders] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -352,7 +358,8 @@ export default function ItineraryView({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   toolbar: { flexDirection: "row", gap: spacing(2), marginBottom: spacing(3) },
   toolButton: {
     flex: 1,

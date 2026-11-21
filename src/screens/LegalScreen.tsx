@@ -1,12 +1,15 @@
+import { useMemo } from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { X } from "lucide-react-native";
-import { colors, spacing } from "../theme";
+import { useTheme, spacing, type Colors } from "../theme";
 import { LEGAL_DOCS, LEGAL_EFFECTIVE_DATE, type LegalDocId } from "../lib/legal";
 
 // Rendered both as a root-stack modal (from Profile) and inline inside a
 // <Modal> on the signed-out Auth screen, which has no navigator.
 export function LegalDocument({ doc, onClose }: { doc: LegalDocId; onClose: () => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const { title, sections } = LEGAL_DOCS[doc];
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -35,19 +38,20 @@ export default function LegalScreen() {
   return <LegalDocument doc={route.params?.doc || "terms"} onClose={() => navigation.goBack()} />;
 }
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing(4),
-    paddingTop: spacing(6),
-    paddingBottom: spacing(3),
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
-  effective: { fontSize: 12, color: colors.textMuted, marginBottom: spacing(4) },
-  heading: { fontSize: 15, fontWeight: "700", color: colors.textPrimary, marginBottom: spacing(1) },
-  body: { fontSize: 14, lineHeight: 21, color: colors.textBody },
-});
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: spacing(4),
+      paddingTop: spacing(6),
+      paddingBottom: spacing(3),
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerTitle: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
+    effective: { fontSize: 12, color: colors.textMuted, marginBottom: spacing(4) },
+    heading: { fontSize: 15, fontWeight: "700", color: colors.textPrimary, marginBottom: spacing(1) },
+    body: { fontSize: 14, lineHeight: 21, color: colors.textBody },
+  });

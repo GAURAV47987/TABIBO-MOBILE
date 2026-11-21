@@ -1,11 +1,14 @@
+import { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { TRIP_TEMPLATES } from "../lib/templates";
 import PlaceBanner from "../components/PlaceBanner";
 import AppHeader from "../components/AppHeader";
 import PendingInvites from "../components/PendingInvites";
 
 export default function HomeScreen({ navigation }: any) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <AppHeader />
@@ -34,12 +37,13 @@ export default function HomeScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  greeting: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing(3) },
-  heading: { fontSize: 16, fontWeight: "600", color: colors.textPrimary, marginBottom: spacing(2) },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing(3) },
-  tile: { width: "47%", borderRadius: radius.lg, overflow: "hidden" },
-  tileText: { position: "absolute", left: 0, right: 0, bottom: 0, padding: spacing(3) },
-  tileTitle: { color: "#fff", fontWeight: "600", fontSize: 14 },
-  tileDays: { color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 2 },
-});
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
+    greeting: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing(3) },
+    heading: { fontSize: 16, fontWeight: "600", color: colors.textPrimary, marginBottom: spacing(2) },
+    grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing(3) },
+    tile: { width: "47%", borderRadius: radius.lg, overflow: "hidden" },
+    tileText: { position: "absolute", left: 0, right: 0, bottom: 0, padding: spacing(3) },
+    tileTitle: { color: "#fff", fontWeight: "600", fontSize: 14 },
+    tileDays: { color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 2 },
+  });

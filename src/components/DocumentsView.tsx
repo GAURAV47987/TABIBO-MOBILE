@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as Clipboard from "expo-clipboard";
 import { Plane, BedDouble, Ticket, IdCard, ShieldCheck, FileText, Paperclip, Plus, X, Copy } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { uploadTripDocument, getTripDocumentUrl, deleteTripDocumentFile } from "../lib/supabase";
 
 // Booking confirmations, tickets, passport scans… Text fields (title,
@@ -64,6 +64,8 @@ function DocModal({
   const [pending, setPending] = useState<PendingFile | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
 
   const pickPhoto = async (fromCamera: boolean) => {
     const perm = fromCamera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -246,6 +248,8 @@ export default function DocumentsView({
   const docs: TripDoc[] = trip.documents || [];
   const [editing, setEditing] = useState<TripDoc | null | undefined>(undefined);
   const [opening, setOpening] = useState<string | null>(null);
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
 
   const saveDoc = async (doc: TripDoc) => {
     const exists = docs.some((d) => d.id === doc.id);
@@ -337,7 +341,8 @@ export default function DocumentsView({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   addButton: {
     flexDirection: "row",
     alignItems: "center",

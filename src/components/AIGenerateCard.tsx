@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { generateItinerary } from "../lib/supabase";
 import { getEffectiveStops } from "../lib/stops";
 import { enumerateDates } from "../lib/dates";
 import { randomUUID } from "expo-crypto";
 
 export default function AIGenerateCard({ trip, onGenerated }: { trip: any; onGenerated: (items: any[]) => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -55,7 +57,8 @@ export default function AIGenerateCard({ trip, onGenerated }: { trip: any; onGen
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   card: {
     padding: spacing(4),
     borderRadius: radius.lg,

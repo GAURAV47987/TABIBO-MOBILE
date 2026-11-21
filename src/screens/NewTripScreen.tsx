@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { X, Check, Plus, Sparkles } from "lucide-react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { createTrip, suggestPopularPlaces } from "../lib/supabase";
 import { searchPlaces } from "../lib/geonames";
 import { geocodeDestination } from "../lib/geocode";
@@ -30,6 +30,8 @@ function PlaceAutocomplete({
   placeholder: string;
   autoFocus?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -91,6 +93,8 @@ function PlaceAutocomplete({
 }
 
 function JourneyStrip({ stops, onChangeDays, onRemove }: { stops: Stop[]; onChangeDays: (i: number, delta: number) => void; onRemove: (i: number) => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: spacing(1) }}>
       {stops.map((s, i) => (
@@ -118,6 +122,8 @@ function JourneyStrip({ stops, onChangeDays, onRemove }: { stops: Stop[]; onChan
 }
 
 export default function NewTripScreen({ navigation }: any) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [step, setStep] = useState(1);
   const [stops, setStops] = useState<Stop[]>([]);
   const [pendingName, setPendingName] = useState("");
@@ -521,7 +527,8 @@ export default function NewTripScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -721,4 +728,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.stamp,
   },
   createButtonText: { color: "#fff", fontWeight: "700" },
-});
+  });

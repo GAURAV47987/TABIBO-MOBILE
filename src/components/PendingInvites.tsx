@@ -1,8 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Mail } from "lucide-react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { listMyPendingInvites, acceptTripInvite, declineTripInvite } from "../lib/supabase";
 import { haptics } from "../lib/haptics";
 
@@ -13,6 +13,8 @@ type Invite = { collaborator_id: string; trip_id: string; destination_name: stri
 // explicitly says yes.
 export default function PendingInvites() {
   const navigation = useNavigation<any>();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [invites, setInvites] = useState<Invite[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -82,7 +84,8 @@ export default function PendingInvites() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   wrap: { gap: spacing(2), marginBottom: spacing(4) },
   card: {
     flexDirection: "row",

@@ -10,7 +10,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { Luggage, Compass, Plus } from "lucide-react-native";
 import type { Session } from "@supabase/supabase-js";
 import { getSession, onAuthStateChange } from "./src/lib/supabase";
-import { colors } from "./src/theme";
+import { ThemeProvider, useTheme } from "./src/theme";
 import AuthScreen from "./src/screens/AuthScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import PlaceholderScreen from "./src/screens/PlaceholderScreen";
@@ -63,6 +63,7 @@ function openTripFromNotification(response: Notifications.NotificationResponse |
 function MainTabs() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
@@ -93,7 +94,7 @@ function MainTabs() {
         </Tab.Screen>
       </Tab.Navigator>
       <PressScale
-        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        style={[styles.fab, { bottom: insets.bottom + 20, backgroundColor: colors.primaryBg }]}
         onPress={() => navigation.navigate("NewTrip")}
         accessibilityLabel="Create new trip"
       >
@@ -104,6 +105,15 @@ function MainTabs() {
 }
 
 function App() {
+  return (
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
+  );
+}
+
+function AppInner() {
+  const { colors } = useTheme();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [onboardingSeen, setOnboardingSeen] = useState<boolean | undefined>(undefined);
 
@@ -183,7 +193,6 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: colors.primaryBg,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",

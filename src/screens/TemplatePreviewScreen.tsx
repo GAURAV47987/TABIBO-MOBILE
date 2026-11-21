@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { X, Camera, Utensils, Sparkles } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { createTrip, updateTrip } from "../lib/supabase";
 import { buildDatedStops } from "../lib/stops";
 import { enumerateDates } from "../lib/dates";
@@ -13,6 +13,8 @@ import DateField from "../components/DateField";
 import PressScale from "../components/PressScale";
 
 export default function TemplatePreviewScreen({ route, navigation }: any) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const { template } = route.params;
   const [startDate, setStartDate] = useState("");
   const [busy, setBusy] = useState(false);
@@ -113,33 +115,34 @@ export default function TemplatePreviewScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  closeButton: { position: "absolute", top: spacing(3), right: spacing(3), zIndex: 10, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 999, padding: spacing(1.5) },
-  bannerText: { position: "absolute", left: 0, right: 0, bottom: 0, padding: spacing(4) },
-  bannerTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
-  bannerDays: { color: "rgba(255,255,255,0.85)", fontSize: 13 },
-  tagline: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing(3) },
-  stopsLine: { fontSize: 12, color: colors.textMuted, marginBottom: spacing(5) },
-  dayCard: { padding: spacing(4), borderRadius: radius.lg, marginBottom: spacing(3), backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  dayTitle: { fontWeight: "600", color: colors.textPrimary, marginBottom: spacing(2) },
-  item: { paddingHorizontal: spacing(3), paddingVertical: spacing(2), borderRadius: radius.md, backgroundColor: colors.bg },
-  itemRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.5) },
-  itemTime: { fontWeight: "600", color: colors.textBody },
-  itemTitle: { color: colors.textBody, flexShrink: 1 },
-  itemNotes: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing(4),
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  footerLabel: { fontSize: 14, color: colors.textTertiary, marginBottom: spacing(1) },
-  footerRow: { flexDirection: "row", gap: spacing(2), alignItems: "center" },
-  useButton: { flexDirection: "row", alignItems: "center", gap: spacing(1.5), backgroundColor: colors.stamp, borderRadius: radius.md, paddingHorizontal: spacing(4), paddingVertical: spacing(2.8) },
-  useButtonText: { color: "#fff", fontWeight: "600" },
-  errorText: { color: colors.stamp, fontSize: 13, marginTop: spacing(2) },
-});
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
+    closeButton: { position: "absolute", top: spacing(3), right: spacing(3), zIndex: 10, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 999, padding: spacing(1.5) },
+    bannerText: { position: "absolute", left: 0, right: 0, bottom: 0, padding: spacing(4) },
+    bannerTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
+    bannerDays: { color: "rgba(255,255,255,0.85)", fontSize: 13 },
+    tagline: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing(3) },
+    stopsLine: { fontSize: 12, color: colors.textMuted, marginBottom: spacing(5) },
+    dayCard: { padding: spacing(4), borderRadius: radius.lg, marginBottom: spacing(3), backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    dayTitle: { fontWeight: "600", color: colors.textPrimary, marginBottom: spacing(2) },
+    item: { paddingHorizontal: spacing(3), paddingVertical: spacing(2), borderRadius: radius.md, backgroundColor: colors.bg },
+    itemRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.5) },
+    itemTime: { fontWeight: "600", color: colors.textBody },
+    itemTitle: { color: colors.textBody, flexShrink: 1 },
+    itemNotes: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+    footer: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      padding: spacing(4),
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    footerLabel: { fontSize: 14, color: colors.textTertiary, marginBottom: spacing(1) },
+    footerRow: { flexDirection: "row", gap: spacing(2), alignItems: "center" },
+    useButton: { flexDirection: "row", alignItems: "center", gap: spacing(1.5), backgroundColor: colors.stamp, borderRadius: radius.md, paddingHorizontal: spacing(4), paddingVertical: spacing(2.8) },
+    useButtonText: { color: "#fff", fontWeight: "600" },
+    errorText: { color: colors.stamp, fontSize: 13, marginTop: spacing(2) },
+  });

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, BackHandler } from "react-native";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { geocodeDestination } from "../lib/geocode";
 import TimeField from "./TimeField";
 
@@ -33,6 +33,8 @@ export default function ItemModal({
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeError, setGeocodeError] = useState("");
   const titleRef = useRef<any>(null);
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
 
   useEffect(() => {
     if (readOnly) return;
@@ -169,7 +171,8 @@ export default function ItemModal({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   overlayWrap: {
     position: "absolute",
     top: 0,

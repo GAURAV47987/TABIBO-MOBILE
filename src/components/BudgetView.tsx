@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Layout
 import { Picker } from "@react-native-picker/picker";
 import { Plus, Wallet, X, Trash2, Printer } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { CATEGORIES, CATEGORY_COLOR, CURRENCIES, CURRENCY_SYMBOL } from "../lib/constants";
 import { useFxRates } from "../lib/fx";
 import { escapeHtml, exportHtmlAsPdf } from "../lib/pdf";
@@ -15,6 +15,8 @@ function fmt(n: number, maxFractionDigits = 0) {
 }
 
 export default function BudgetView({ trip, onSave, canEdit = true }: { trip: any; onSave: (budget: any[]) => void; canEdit?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const budget = trip.budget || [];
   const homeCurrency = trip.home_currency || "USD";
   const { rates } = useFxRates();
@@ -311,7 +313,8 @@ export default function BudgetView({ trip, onSave, canEdit = true }: { trip: any
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   addButton: {
     flexDirection: "row",
     alignItems: "center",

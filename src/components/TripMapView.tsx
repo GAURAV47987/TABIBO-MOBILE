@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Linkin
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Plus, Trash2, Navigation } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
-import { colors, radius, spacing } from "../theme";
+import { useTheme, radius, spacing, type Colors } from "../theme";
 import { geocodeDestination } from "../lib/geocode";
 import { getEffectiveStops } from "../lib/stops";
 
@@ -31,6 +31,8 @@ function shortDay(date: string) {
 }
 
 export default function TripMapView({ trip, onSave, canEdit = true }: { trip: any; onSave: (pins: any[]) => void; canEdit?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const pins = trip.map_pins || [];
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
@@ -274,7 +276,8 @@ export default function TripMapView({ trip, onSave, canEdit = true }: { trip: an
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: Colors) =>
+  StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { color: colors.textSecondary },
   map: { width: "100%", height: 280, borderRadius: radius.lg, marginBottom: spacing(3), borderWidth: 1, borderColor: colors.border },
