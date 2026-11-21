@@ -1,4 +1,4 @@
-import { enumerateDates } from "./dates";
+import { enumerateDates, toISODateLocal } from "./dates";
 
 const forecastUrl = (lat, lng) =>
   `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=16`;
@@ -9,7 +9,7 @@ const archiveUrl = (lat, lng, start, end) =>
 function shiftYears(dateStr, years) {
   const d = new Date(dateStr + "T00:00:00");
   d.setFullYear(d.getFullYear() + years);
-  return d.toISOString().slice(0, 10);
+  return toISODateLocal(d);
 }
 
 function summarize(daily, wantedDates) {

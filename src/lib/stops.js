@@ -1,9 +1,10 @@
 import { randomUUID } from "expo-crypto";
+import { toISODateLocal } from "./dates";
 
 function addDays(dateStr, n) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return toISODateLocal(d);
 }
 
 // Turns [{name, lat, lng, days}] into dated stops, sequenced back-to-back

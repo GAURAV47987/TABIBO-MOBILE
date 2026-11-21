@@ -6,6 +6,7 @@ import { createTrip, suggestPopularPlaces } from "../lib/supabase";
 import { searchPlaces } from "../lib/geonames";
 import { geocodeDestination } from "../lib/geocode";
 import { buildDatedStops } from "../lib/stops";
+import { toISODateLocal } from "../lib/dates";
 import { getTripClimate } from "../lib/weather";
 import { CURRENCIES } from "../lib/constants";
 import DateField from "../components/DateField";
@@ -28,7 +29,7 @@ type Stop = {
 function addDaysToDate(dateStr: string, n: number) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return toISODateLocal(d);
 }
 
 function daysBetween(startStr: string, endStr: string) {
@@ -555,14 +556,12 @@ export default function NewTripScreen({ navigation }: any) {
                       )}
                     </View>
                     <View style={styles.cityDateRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.cityDateLabel}>From</Text>
-                        <DateField value={s.startDate || ""} onChange={(v) => setCityDate(i, "startDate", v)} placeholder="Select a date" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.cityDateLabel}>To</Text>
-                        <DateField value={s.endDate || ""} onChange={(v) => setCityDate(i, "endDate", v)} placeholder="Select a date" />
-                      </View>
+                      <Text style={styles.cityDateLabel}>From</Text>
+                      <DateField value={s.startDate || ""} onChange={(v) => setCityDate(i, "startDate", v)} placeholder="Select a date" />
+                    </View>
+                    <View style={[styles.cityDateRow, { marginTop: spacing(3) }]}>
+                      <Text style={styles.cityDateLabel}>To</Text>
+                      <DateField value={s.endDate || ""} onChange={(v) => setCityDate(i, "endDate", v)} placeholder="Select a date" />
                     </View>
                   </View>
                 );
@@ -813,7 +812,7 @@ const getStyles = (colors: Colors) =>
   },
   cityDateHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing(3) },
   cityDateBadge: { fontSize: 12, color: colors.textMuted, marginLeft: spacing(1) },
-  cityDateRow: { flexDirection: "row", gap: spacing(3) },
+  cityDateRow: {},
   cityDateLabel: { fontSize: 12, color: colors.textTertiary, marginBottom: spacing(1) },
   addCityButtonBold: {
     flexDirection: "row",

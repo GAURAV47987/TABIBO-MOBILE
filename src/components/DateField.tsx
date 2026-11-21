@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTheme, radius, spacing, type Colors } from "../theme";
+import { toISODateLocal } from "../lib/dates";
 
 // value/onChange use the same "YYYY-MM-DD" string shape as the rest of
 // the app (trip.start_date etc.) — this just wraps the native date
@@ -11,19 +12,33 @@ export default function DateField({ value, onChange, placeholder = "Select a dat
   const styles = useMemo(() => getStyles(colors), [colors]);
   const [show, setShow] = useState(false);
   const dateValue = value ? new Date(value + "T00:00:00") : new Date();
+  // iOS's inline picker fires one onChange immediately when it mounts,
+  // reporting whatever date it's showing by default — not a real user
+  // pick. Left unguarded, two empty fields opened one after another (e.g.
+  // a city's From/To) would both silently collapse onto that same
+  // default date before either is actually tapped.
+  const justOpenedRef = useRef(false);
+
+  const openPicker = () => {
+    justOpenedRef.current = true;
+    setShow(true);
+  };
 
   const handleChange = (event: any, selected?: Date) => {
     if (Platform.OS === "android") setShow(false);
     if (event.type === "dismissed") return;
+    if (Platform.OS === "ios" && justOpenedRef.current) {
+      justOpenedRef.current = false;
+      return;
+    }
     if (selected) {
-      const iso = selected.toISOString().slice(0, 10);
-      onChange(iso);
+      onChange(toISODateLocal(selected));
     }
   };
 
   return (
     <View>
-      <TouchableOpacity style={styles.field} onPress={() => setShow(true)}>
+      <TouchableOpacity style={styles.field} onPress={openPicker}>
         <Text style={value ? styles.valueText : styles.placeholderText}>
           {value || placeholder}
         </Text>

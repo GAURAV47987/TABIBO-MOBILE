@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CURRENCIES, FX_STORAGE_KEY, FX_FALLBACK_RATES, FX_API_URLS } from "./constants";
 import { loadFromStorage, saveToStorage } from "./storage";
+import { toISODateLocal } from "./dates";
 
 export type FxStatus = "loading" | "live" | "cached" | "offline";
 
@@ -33,7 +34,7 @@ export function useFxRates() {
         if (Object.keys(newRates).length < CURRENCIES.length - 5) {
           throw new Error("unexpected response shape");
         }
-        const date = data.date || new Date().toISOString().slice(0, 10);
+        const date = data.date || toISODateLocal(new Date());
         setRates(newRates);
         setUpdatedAt(date);
         updatedAtRef.current = date;
