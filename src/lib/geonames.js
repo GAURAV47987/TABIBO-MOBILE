@@ -156,7 +156,7 @@ function toResult(g) {
     : isRegion
     ? [g.name, g.countryName].filter(Boolean).join(", ")
     : [g.name, g.adminName1, g.countryName].filter(Boolean).join(", ");
-  return { name: g.name, label, lat: parseFloat(g.lat), lng: parseFloat(g.lng) };
+  return { name: g.name, label, lat: parseFloat(g.lat), lng: parseFloat(g.lng), isCountry };
 }
 
 export async function searchPlaces(query) {

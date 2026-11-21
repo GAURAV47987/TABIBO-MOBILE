@@ -15,7 +15,27 @@ import { scheduleAbandonedPlanningNudge, schedulePostTripNudge } from "../lib/re
 
 const STEPS = ["Destination", "Route", "Add-ons"];
 
-type Stop = { name: string; lat: number; lng: number; days: number };
+type Stop = {
+  name: string;
+  lat: number;
+  lng: number;
+  days: number;
+  isCountry?: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
+function addDaysToDate(dateStr: string, n: number) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function daysBetween(startStr: string, endStr: string) {
+  const a = new Date(startStr + "T00:00:00").getTime();
+  const b = new Date(endStr + "T00:00:00").getTime();
+  return Math.round((b - a) / 86400000) + 1;
+}
 
 function PlaceAutocomplete({
   value,
@@ -23,12 +43,18 @@ function PlaceAutocomplete({
   onPick,
   placeholder,
   autoFocus,
+  prefillFrom,
 }: {
   value: string;
   onChangeText: (v: string) => void;
-  onPick: (place: { name: string; lat: number; lng: number }) => void;
+  onPick: (place: { name: string; lat: number; lng: number; isCountry?: boolean }) => void;
   placeholder: string;
   autoFocus?: boolean;
+  // When set (the trip's known country) and nothing's been typed yet, the
+  // suggestions list pre-fills with that country's biggest cities instead
+  // of waiting for 2+ characters — picking a city shouldn't require
+  // re-typing the country you already told it.
+  prefillFrom?: string;
 }) {
   const { colors } = useTheme();
   const styles = useMemo(() => getStyles(colors), [colors]);
@@ -36,6 +62,16 @@ function PlaceAutocomplete({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const timerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!prefillFrom || value) return;
+    setLoading(true);
+    searchPlaces(prefillFrom)
+      .then((results) => setSuggestions(results.filter((r: any) => !r.isCountry)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleInput = (text: string) => {
     onChangeText(text);
@@ -126,6 +162,11 @@ export default function NewTripScreen({ navigation }: any) {
   const styles = useMemo(() => getStyles(colors), [colors]);
   const [step, setStep] = useState(1);
   const [stops, setStops] = useState<Stop[]>([]);
+  // The step-1 pick's own identity, kept even after a real city replaces it
+  // as stops[0] — still needed for the "Japan — N day trip" header, the
+  // add-city dropdown prefill, and restoring the placeholder if every city
+  // gets removed. Only set when that pick was a whole country, not a city.
+  const [countryContext, setCountryContext] = useState<{ name: string; lat: number; lng: number } | null>(null);
   const [pendingName, setPendingName] = useState("");
   const [addingStop, setAddingStop] = useState(false);
   const [newStopName, setNewStopName] = useState("");
@@ -144,14 +185,43 @@ export default function NewTripScreen({ navigation }: any) {
   const changeDays = (i: number, delta: number) => {
     setStops((prev) => prev.map((s, idx) => (idx === i ? { ...s, days: Math.max(1, s.days + delta) } : s)));
   };
-  const removeStop = (i: number) => setStops((prev) => prev.filter((_, idx) => idx !== i));
+
+  // Removing the last real city would otherwise leave an empty, dead-end
+  // route — fall back to the whole-country placeholder when there is one.
+  const removeStop = (i: number) => {
+    setStops((prev) => {
+      const next = prev.filter((_, idx) => idx !== i);
+      if (next.length === 0 && countryContext) {
+        return [{ name: countryContext.name, lat: countryContext.lat, lng: countryContext.lng, days: totalDays, isCountry: true }];
+      }
+      return next;
+    });
+  };
+
+  // A real city's own From/To dates are the source of truth once set —
+  // `days` is kept in sync purely for the progress bar and the small "Xd"
+  // badge, never the other way around.
+  const setCityDate = (i: number, field: "startDate" | "endDate", value: string) => {
+    setStops((prev) =>
+      prev.map((s, idx) => {
+        if (idx !== i) return s;
+        const next = { ...s, [field]: value };
+        if (next.startDate && next.endDate) {
+          const span = daysBetween(next.startDate, next.endDate);
+          if (span > 0) next.days = span;
+        }
+        return next;
+      })
+    );
+  };
 
   // Picking a place no longer advances the step — destination, dates and
   // currency all live on step 1 together now, so this just reveals the
   // rest of that page's fields in place.
-  const pickFirstPlace = (place: { name: string; lat: number; lng: number }) => {
+  const pickFirstPlace = (place: { name: string; lat: number; lng: number; isCountry?: boolean }) => {
     setError("");
-    setStops([{ name: place.name, lat: place.lat, lng: place.lng, days: 3 }]);
+    setStops([{ name: place.name, lat: place.lat, lng: place.lng, days: 3, isCountry: place.isCountry }]);
+    setCountryContext(place.isCountry ? { name: place.name, lat: place.lat, lng: place.lng } : null);
   };
 
   const continueStep1 = async () => {
@@ -161,6 +231,7 @@ export default function NewTripScreen({ navigation }: any) {
     try {
       const place = await geocodeDestination(pendingName.trim());
       setStops([{ name: pendingName.trim(), lat: place.lat, lng: place.lng, days: 3 }]);
+      setCountryContext(null);
     } catch (err: any) {
       setError(err.message || "Could not find that place");
     } finally {
@@ -168,8 +239,27 @@ export default function NewTripScreen({ navigation }: any) {
     }
   };
 
+  // The first real city REPLACES the whole-country placeholder outright
+  // (rather than sitting alongside it) — that's what stops "Japan: 7d" and
+  // "Tokyo: 2d" from both counting toward the total at once. Every
+  // subsequent city is appended normally. New cities default to starting
+  // right after the previous one ends (or the trip's own start date, for
+  // the first), spanning 2 days — a starting point the From/To pickers
+  // are free to override, including leaving a gap for travel days.
   const addStop = async (place: { name: string; lat: number; lng: number }) => {
-    setStops((prev) => [...prev, { name: place.name, lat: place.lat, lng: place.lng, days: 2 }]);
+    const isFirstRealCity = stops.length === 1 && !!stops[0]?.isCountry;
+    const prevCity = isFirstRealCity ? null : stops[stops.length - 1];
+    const defaultStart = isFirstRealCity ? startDate || null : prevCity?.endDate ? addDaysToDate(prevCity.endDate, 1) : null;
+    const defaultEnd = defaultStart ? addDaysToDate(defaultStart, 1) : null;
+    const newCity: Stop = {
+      name: place.name,
+      lat: place.lat,
+      lng: place.lng,
+      days: defaultStart && defaultEnd ? daysBetween(defaultStart, defaultEnd) : 2,
+      startDate: defaultStart,
+      endDate: defaultEnd,
+    };
+    setStops((prev) => (isFirstRealCity ? [newCity] : [...prev, newCity]));
     setAddingStop(false);
     setNewStopName("");
   };
@@ -204,13 +294,37 @@ export default function NewTripScreen({ navigation }: any) {
   const toggleSuggestion = async (place: { name: string; reason: string }) => {
     const already = stops.some((s) => s.name === place.name);
     if (already) {
-      setStops((prev) => prev.filter((s) => s.name !== place.name));
+      setStops((prev) => {
+        const next = prev.filter((s) => s.name !== place.name);
+        if (next.length === 0 && countryContext) {
+          return [{ name: countryContext.name, lat: countryContext.lat, lng: countryContext.lng, days: totalDays, isCountry: true }];
+        }
+        return next;
+      });
       return;
     }
     setGeocodingName(place.name);
     try {
       const geo = await geocodeDestination(place.name);
-      setStops((prev) => [...prev, { name: place.name, lat: geo.lat, lng: geo.lng, days: 2 }]);
+      // Same replace-the-placeholder rule as the Route step's addStop: if
+      // someone skips straight to Add-ons without breaking the country
+      // down first, picking a suggestion here shouldn't recreate the
+      // "Japan: 7d" + "Kyoto: 2d" double-count it fixes there.
+      setStops((prev) => {
+        const isFirstRealCity = prev.length === 1 && !!prev[0]?.isCountry;
+        const prevCity = isFirstRealCity ? null : prev[prev.length - 1];
+        const defaultStart = isFirstRealCity ? startDate || null : prevCity?.endDate ? addDaysToDate(prevCity.endDate, 1) : null;
+        const defaultEnd = defaultStart ? addDaysToDate(defaultStart, 1) : null;
+        const newCity: Stop = {
+          name: place.name,
+          lat: geo.lat,
+          lng: geo.lng,
+          days: defaultStart && defaultEnd ? daysBetween(defaultStart, defaultEnd) : 2,
+          startDate: defaultStart,
+          endDate: defaultEnd,
+        };
+        return isFirstRealCity ? [newCity] : [...prev, newCity];
+      });
     } catch (err) {
       // Couldn't geocode this suggestion — leave it unselected.
     } finally {
@@ -223,14 +337,21 @@ export default function NewTripScreen({ navigation }: any) {
     setError("");
     try {
       const dated = buildDatedStops(stops, startDate || null);
-      const endDate = dated[dated.length - 1]?.endDate || null;
+      // Manually-dated cities aren't guaranteed to be in chronological
+      // order (or contiguous) the way sequenced stops always are, so the
+      // trip's overall span is the min/max across all of them, not just
+      // the first/last array entries.
+      const starts = dated.map((s: any) => s.startDate).filter(Boolean) as string[];
+      const ends = dated.map((s: any) => s.endDate).filter(Boolean) as string[];
+      const overallStart = starts.length ? starts.reduce((min, d) => (d < min ? d : min)) : startDate || null;
+      const overallEnd = ends.length ? ends.reduce((max, d) => (d > max ? d : max)) : null;
       const autoName = stops.length <= 2 ? stops.map((s) => s.name).join(" → ") : `${stops[0].name} +${stops.length - 1} more`;
       const trip = await createTrip({
         destinationName: tripName.trim() || autoName,
         lat: dated[0].lat,
         lng: dated[0].lng,
-        startDate: startDate || null,
-        endDate,
+        startDate: overallStart,
+        endDate: overallEnd,
         homeCurrency,
         stops: dated,
       });
@@ -356,6 +477,7 @@ export default function NewTripScreen({ navigation }: any) {
                 ? `Nice — here's how your ${totalDays} day${totalDays === 1 ? "" : "s"} break down.`
                 : `Split your ${totalDays} day${totalDays === 1 ? "" : "s"} across every stop — add as many cities as you like.`}
             </Text>
+            {countryContext && <Text style={styles.countryHeader}>{countryContext.name} · {totalDays} day trip</Text>}
 
             {stops.length === 1 && (
               <View style={styles.calloutBox}>
@@ -389,38 +511,75 @@ export default function NewTripScreen({ navigation }: any) {
             </View>
 
             <View style={{ gap: spacing(2.5) }}>
-              {stops.map((s, i) => (
-                <View key={`${s.name}-${i}`} style={styles.stopCard}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5), flexShrink: 1 }}>
-                    <View style={styles.stopCardDot} />
-                    <View style={{ flexShrink: 1 }}>
-                      <Text style={styles.stopCardName}>{s.name}</Text>
-                      {stops.length > 1 ? (
+              {stops.map((s, i) => {
+                // Nothing broken down yet: show the whole-country placeholder
+                // exactly as before, with its own day stepper. The moment a
+                // real city exists, it replaces this row outright (see
+                // addStop) — real cities never share space with it, so
+                // there's no "Japan: 7d + Tokyo: 2d" double count.
+                const isPlaceholder = stops.length === 1 && !!s.isCountry;
+                if (isPlaceholder) {
+                  return (
+                    <View key={`${s.name}-${i}`} style={styles.stopCard}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5), flexShrink: 1 }}>
+                        <View style={styles.stopCardDot} />
+                        <View style={{ flexShrink: 1 }}>
+                          <Text style={styles.stopCardName}>{s.name}</Text>
+                          <Text style={styles.stopCardHint}>Whole country — add cities to break this down</Text>
+                        </View>
+                      </View>
+                      <View style={styles.stopCardStepper}>
+                        <TouchableOpacity style={styles.stepperButton} onPress={() => changeDays(i, -1)}>
+                          <Text style={styles.stepperText}>−</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.stopCardDays}>{s.days}d</Text>
+                        <TouchableOpacity style={styles.stepperButton} onPress={() => changeDays(i, 1)}>
+                          <Text style={styles.stepperText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                }
+                return (
+                  <View key={`${s.name}-${i}`} style={styles.cityDateCard}>
+                    <View style={styles.cityDateHeader}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5) }}>
+                        <View style={styles.stopCardDot} />
+                        <Text style={styles.stopCardName}>{s.name}</Text>
+                        <Text style={styles.cityDateBadge}>{s.days}d</Text>
+                      </View>
+                      {(stops.length > 1 || countryContext) && (
                         <TouchableOpacity onPress={() => removeStop(i)}>
                           <Text style={styles.stopCardRemove}>Remove</Text>
                         </TouchableOpacity>
-                      ) : (
-                        <Text style={styles.stopCardHint}>Whole country — add cities to break this down</Text>
                       )}
                     </View>
+                    <View style={styles.cityDateRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cityDateLabel}>From</Text>
+                        <DateField value={s.startDate || ""} onChange={(v) => setCityDate(i, "startDate", v)} placeholder="Select a date" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cityDateLabel}>To</Text>
+                        <DateField value={s.endDate || ""} onChange={(v) => setCityDate(i, "endDate", v)} placeholder="Select a date" />
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.stopCardStepper}>
-                    <TouchableOpacity style={styles.stepperButton} onPress={() => changeDays(i, -1)}>
-                      <Text style={styles.stepperText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.stopCardDays}>{s.days}d</Text>
-                    <TouchableOpacity style={styles.stepperButton} onPress={() => changeDays(i, 1)}>
-                      <Text style={styles.stepperText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
 
             {addingStop ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2), marginTop: spacing(3) }}>
                 <View style={{ flex: 1 }}>
-                  <PlaceAutocomplete autoFocus placeholder="e.g. Paris" value={newStopName} onChangeText={setNewStopName} onPick={addStop} />
+                  <PlaceAutocomplete
+                    autoFocus
+                    placeholder="e.g. Paris"
+                    value={newStopName}
+                    onChangeText={setNewStopName}
+                    onPick={addStop}
+                    prefillFrom={countryContext?.name}
+                  />
                 </View>
                 <TouchableOpacity onPress={() => setAddingStop(false)}>
                   <X size={18} color={colors.textTertiary} />
@@ -644,6 +803,18 @@ const getStyles = (colors: Colors) =>
   stopCardHint: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   stopCardStepper: { flexDirection: "row", alignItems: "center", gap: spacing(2) },
   stopCardDays: { fontSize: 13, color: colors.textTertiary, minWidth: 18, textAlign: "center" },
+  countryHeader: { fontSize: 13, color: colors.textMuted, marginTop: -spacing(2), marginBottom: spacing(4) },
+  cityDateCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(3.5),
+  },
+  cityDateHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing(3) },
+  cityDateBadge: { fontSize: 12, color: colors.textMuted, marginLeft: spacing(1) },
+  cityDateRow: { flexDirection: "row", gap: spacing(3) },
+  cityDateLabel: { fontSize: 12, color: colors.textTertiary, marginBottom: spacing(1) },
   addCityButtonBold: {
     flexDirection: "row",
     alignItems: "center",

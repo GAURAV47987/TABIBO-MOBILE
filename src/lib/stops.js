@@ -10,7 +10,18 @@ function addDays(dateStr, n) {
 // starting at startDate (stop 1 gets days 1..N, stop 2 picks up right
 // after, etc). With no startDate yet, stops keep their names/days but no
 // dates — the trip can still be created and dated later.
+//
+// A stop that already carries its own startDate/endDate (set directly via
+// a per-city date picker, rather than derived from a day-count) is passed
+// through as-is instead of being re-sequenced — the user may have left a
+// deliberate gap between cities (a travel day) that back-to-back
+// sequencing would silently erase. This only kicks in once EVERY stop has
+// explicit dates; a mix of dated/undated stops still falls through to the
+// day-count sequencing below.
 export function buildDatedStops(rawStops, startDate) {
+  if (rawStops.length && rawStops.every((s) => s.startDate && s.endDate)) {
+    return rawStops.map((s) => ({ id: randomUUID(), name: s.name, lat: s.lat, lng: s.lng, days: s.days, startDate: s.startDate, endDate: s.endDate }));
+  }
   if (!startDate) {
     return rawStops.map((s) => ({ id: randomUUID(), name: s.name, lat: s.lat, lng: s.lng, days: s.days, startDate: null, endDate: null }));
   }
